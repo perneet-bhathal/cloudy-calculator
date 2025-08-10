@@ -9,7 +9,7 @@ and bug fixes for mixed-unit arithmetic.
 
 ---
 
-## 🚀 About this update
+## About this update
 
 - Based on the original Cloudy Calculator, but rebuilt from scratch to run locally
 - Fully passes the **395 comprehensive tests** in `comprehensive_tests.html` with **100% success**
@@ -19,7 +19,7 @@ and bug fixes for mixed-unit arithmetic.
 
 ---
 
-## ✨ Features
+## Features
 
 - **Mixed-unit math**: `10 lb - 2 kg in g`, `2 cups + 500 ml in liters`
 - **Unit conversions**: length, area, volume, mass, time, speed
@@ -32,7 +32,7 @@ and bug fixes for mixed-unit arithmetic.
 
 ---
 
-## 🧪 Testing
+## Testing
 
 This version has been run against the **full 395-case comprehensive test suite**  
 (`comprehensive_tests.html`) and passed **100%** without failures.  
@@ -47,7 +47,7 @@ Tests cover:
 
 ---
 
-## 🔒 Privacy
+## Privacy
 
 - **No tracking, no telemetry, no analytics**
 - All calculations happen locally in your browser
