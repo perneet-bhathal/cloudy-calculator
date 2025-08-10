@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cloudy Calculator</title>
+    <link rel="stylesheet" type="text/css" href="css/calc.css" />
+    <style>
+        #calcWrapper {
+            position: relative;
+            width: 450px;
+            height: 401px;
+        }
+    </style>
+</head>
+<body id="calc">
+    <div style="height:0;">
+        <div id="calcWrapper" class="vbox">
+            <table id="calcWrapperTable">
+                <!-- Header -->
+                <tr>
+                    <td>
+                        <div id="headerWrapper" class="boxFlex0">
+                            <div id="headerLinks">
+                                <a href="#popOut" id="popOut" class="headerLink">
+                                    <img src="icons/popout.png"/>
+                                </a>
+                                <span class="headerSeparator">|</span>
+                                <a href="http://code.google.com/p/chromey-calculator/wiki/Help" target="_tab" id="googleCalcHelp" class="headerLink">Help</a>
+                                <span class="headerSeparator">|</span>
+                                <a href="options.html" target="_tab" id="options" class="headerLink">Options</a>
+                                <span class="headerSeparator">|</span>
+                                <a href="#calcResults" id="clearAll" class="headerLink">Clear</a>
+                            </div>
+                            <a href="https://chrome.google.com/webstore/detail/acgimceffoceigocablmjdpebeodphgc" target="_tab" id="chromeyCalcPageLink">
+                                <pre id="chromeyCalcName">Cloudy Calculator</pre>
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                <!-- Results -->
+                <tr>
+                    <td id="calcResultsWrapperCell">
+                        <div id="calcResultsWrapper" class="boxFlex1">
+                            <ul id="calcResults"></ul>
+                        </div>
+                    </td>
+                </tr>
+                <!-- Input -->
+                <tr>
+                    <td>
+                        <div id="calcInputWrapper" class="boxFlex0">
+                            <input type="text" id="calcInput" tabindex="1"/>
+                            <div id="inputMarker">></div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script src="js/units.js"></script>
+    <script src="js/popup.js"></script>
+</body>
+</html>

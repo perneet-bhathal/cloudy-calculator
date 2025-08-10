@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Cloudy Calculator - Comprehensive Test Suite</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .test-section h2 { margin-top: 0; color: #333; }
+        .test-item { margin: 10px 0; padding: 8px; border-left: 3px solid #ddd; }
+        .test-item.pass { border-left-color: #4CAF50; background-color: #f1f8e9; }
+        .test-item.fail { border-left-color: #f44336; background-color: #ffebee; }
+        .test-item.error { border-left-color: #ff9800; background-color: #fff3e0; }
+        .test-input { font-family: monospace; color: #666; }
+        .test-expected { font-weight: bold; }
+        .test-actual { font-style: italic; }
+        .summary { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .run-all-btn { background-color: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
+        .run-all-btn:hover { background-color: #1976D2; }
+        .progress { margin: 10px 0; }
+        .progress-bar { width: 100%; height: 20px; background-color: #f0f0f0; border-radius: 10px; overflow: hidden; }
+        .progress-fill { height: 100%; background-color: #4CAF50; transition: width 0.3s ease; }
+    </style>
+</head>
+<body>
+    <h1>Cloudy Calculator - Comprehensive Test Suite</h1>
+    
+    <div class="summary">
+        <h2>Test Summary</h2>
+        <p>Total Tests: <span id="total-tests">0</span></p>
+        <p>Passed: <span id="passed-tests">0</span></p>
+        <p>Failed: <span id="failed-tests">0</span></p>
+        <p>Errors: <span id="error-tests">0</span></p>
+        <p>Success Rate: <span id="success-rate">0%</span></p>
+        
+        <div class="progress">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+            </div>
+        </div>
+        
+        <button class="run-all-btn" onclick="runAllTests()">Run All Tests</button>
+    </div>
+
+    <div id="test-results"></div>
+
+    <script src="src/js/units.js"></script>
+    <script>
+        // Test suite for Cloudy Calculator
+        class TestSuite {
+            constructor() {
+                this.tests = [];
+                this.results = [];
+                this.currentTestIndex = 0;
+                this.setupTests();
+            }
+
+            setupTests() {
+                // Length tests
+                this.addTest("1 km in m", "1000", "1. 1 km in m → 1000");
+                this.addTest("1500 m in km", "1.5", "2. 1500 m in km → 1.5");
+                this.addTest("3 ft + 10 in in m", "≈1.1684", "3. 3 ft + 10 in in m → ≈1.1684");
+                this.addTest("5km+300m in km", "5.3", "4. 5km+300m in km → 5.3");
+                this.addTest("12 inches in ft", "1", "5. 12 inches in ft → 1");
+                this.addTest("2 mi in m", "3218.688", "6. 2 mi in m → 3218.688");
+                this.addTest("5 feet 3 inches in cm", "≈160.02", "7. 5 feet 3 inches in cm → ≈160.02");
+                this.addTest("2540 mm in m", "2.54", "8. 2540 mm in m → 2.54");
+                this.addTest("1 ly in km", "≈9.461e12", "9. 1 ly in km → ≈9.461e12");
+                this.addTest("1 au in m", "≈1.496e11", "10. 1 au in m → ≈1.496e11");
+
+                // Area tests
+                this.addTest("2 acre in m²", "8093.7128448", "11. 2 acre in m² → 8093.7128448");
+                this.addTest("10000 m² in ha", "1", "12. 10000 m² in ha → 1");
+                this.addTest("1 km² in m²", "1e6", "13. 1 km² in m² → 1e6");
+
+                // Volume tests
+                this.addTest("1 L in ml", "1000", "14. 1 L in ml → 1000");
+                this.addTest("2 cups + 500 ml in liters", "≈0.973176", "15. 2 cups + 500 ml in liters → ≈0.973176");
+                this.addTest("1/4 cup in tbsp", "4", "16. 1/4 cup in tbsp → 4");
+                this.addTest("30 ml in tbsp", "≈2.029", "17. 30 ml in tbsp → ≈2.029");
+                this.addTest("1 gal in L", "3.785411784", "18. 1 gal in L → 3.785411784");
+                this.addTest("1 pint in ml", "≈473.176473", "19. 1 pint in ml → ≈473.176473");
+                this.addTest("500 ml in cups", "≈2.113", "20. 500 ml in cups → ≈2.113");
+                this.addTest("750 millilitres in cups", "≈3.1701", "21. 750 millilitres in cups → ≈3.1701");
+                this.addTest("12 fl-oz in ml", "≈354.882", "22. 12 fl-oz in ml → ≈354.882");
+
+                // Mass/Weight tests
+                this.addTest("1000 g in kg", "1", "23. 1000 g in kg → 1");
+                this.addTest("10 lb in kg", "≈4.5359237", "24. 10 lb in kg → ≈4.5359237");
+                this.addTest("10 lbs - 2 kg in grams", "≈2535.9237", "25. 10 lbs - 2 kg in grams → ≈2535.9237");
+                this.addTest("12 oz in g", "≈340.194", "26. 12 oz in g → ≈340.194");
+                this.addTest("1 stone in kg", "≈6.35029318", "27. 1 stone in kg → ≈6.35029318");
+                this.addTest("11 st 4 lb in kg", "≈71.214", "28. 11 st 4 lb in kg → ≈71.214");
+                this.addTest("1 metric-ton in kg", "1000", "29. 1 metric-ton in kg → 1000");
+                this.addTest("1 ton in kg", "≈907.18474", "30. 1 ton in kg → ≈907.18474");
+
+                // Time tests
+                this.addTest("60 s in min", "1", "31. 60 s in min → 1");
+                this.addTest("1 day + 12 hours in minutes", "2160", "32. 1 day + 12 hours in minutes → 2160");
+                this.addTest("2 hours in minutes", "120", "33. 2 hours in minutes → 120");
+                this.addTest("1 week in days", "7", "34. 1 week in days → 7");
+                this.addTest("90 min in h", "1.5", "35. 90 min in h → 1.5");
+                this.addTest("1000 ms in s", "1", "36. 1000 ms in s → 1");
+                this.addTest("1 month in days", "≈30", "37. 1 month in days → ≈30");
+
+                // Speed tests
+                this.addTest("65 mph in m/s", "≈29.0576", "38. 65 mph in m/s → ≈29.0576");
+                this.addTest("100 km/h in m/s", "≈27.7778", "39. 100 km/h in m/s → ≈27.7778");
+                this.addTest("10 m/s in mph", "≈22.3694", "40. 10 m/s in mph → ≈22.3694");
+
+                // Temperature tests
+                this.addTest("32 F to C", "0 C", "41. 32 F to C → 0 C");
+                this.addTest("100 C to K", "373.15 K", "42. 100 C to K → 373.15 K");
+                this.addTest("671.67 R to C", "≈100 C", "43. 671.67 R to C → ≈100 C");
+                this.addTest("-40 C to F", "-40 F", "44. -40 C to F → -40 F");
+                this.addTest("212 F to K", "373.15 K", "45. 212 F to K → 373.15 K");
+
+                // Number base tests
+                this.addTest("10 + 0xA + 0b1010 in hex", "0x1E", "46. 10 + 0xA + 0b1010 in hex → 0x1E");
+                this.addTest("15 + 0x10 in octal", "0o33", "47. 15 + 0x10 in octal → 0o33");
+                this.addTest("7 + 0o10 in binary", "0b1001", "48. 7 + 0o10 in binary → 0b1001");
+                this.addTest("0xFF + 1 in decimal", "256", "49. 0xFF + 1 in decimal → 256");
+                this.addTest("0b1111 - 0b1 in hex", "0xE", "50. 0b1111 - 0b1 in hex → 0xE");
+                this.addTest("0o77 + 1 in binary", "0b1000000", "51. 0o77 + 1 in binary → 0b1000000");
+
+                // Mathematical functions tests
+                this.addTest("sin(3.141592653589793)", "≈0", "52. sin(3.141592653589793) → ≈0");
+                this.addTest("cos(0)", "1", "53. cos(0) → 1");
+                this.addTest("tan(0)", "0", "54. tan(0) → 0");
+                this.addTest("log(1000)", "3", "55. log(1000) → 3");
+                this.addTest("ln(2.718281828)", "≈1", "56. ln(2.718281828) → ≈1");
+                this.addTest("sqrt(81)", "9", "57. sqrt(81) → 9");
+                this.addTest("cbrt(27)", "3", "58. cbrt(27) → 3");
+                this.addTest("abs(-42)", "42", "59. abs(-42) → 42");
+                this.addTest("floor(3.9)", "3", "60. floor(3.9) → 3");
+                this.addTest("ceil(3.1)", "4", "61. ceil(3.1) → 4");
+                this.addTest("round(2.5)", "3", "62. round(2.5) → 3");
+                this.addTest("exp(1)", "≈2.718281828", "63. exp(1) → ≈2.718281828");
+                this.addTest("pow(2,10)", "1024", "64. pow(2,10) → 1024");
+                this.addTest("factorial(10)", "3628800", "65. factorial(10) → 3628800");
+                this.addTest("fact(0)", "1", "66. fact(0) → 1");
+                this.addTest("factorial(170)", "finite number", "67. factorial(170) → finite number");
+                this.addTest("factorial(171)", "NaN/error", "68. factorial(171) → NaN/error");
+
+                // Constants tests
+                this.addTest("pi", "3.141592653589793", "69. pi → 3.141592653589793");
+                this.addTest("e", "2.718281828459045", "70. e → 2.718281828459045");
+                this.addTest("c", "299792458", "71. c → 299792458");
+                this.addTest("h", "6.62607015e-34", "72. h → 6.62607015e-34");
+                this.addTest("hbar", "1.054571817e-34", "73. hbar → 1.054571817e-34");
+                this.addTest("NA", "6.02214076e23", "74. NA → 6.02214076e23");
+                this.addTest("phi", "1.618033988749895", "75. phi → 1.618033988749895");
+                this.addTest("gamma", "≈0.5772156649", "76. gamma → ≈0.5772156649");
+
+                // Currency tests
+                this.addTest("100 USD to EUR", "numeric", "77. 100 USD to EUR → numeric");
+                this.addTest("50 EUR to USD", "numeric", "78. 50 EUR to USD → numeric");
+                this.addTest("100 JPY to GBP", "numeric", "79. 100 JPY to GBP → numeric");
+                this.addTest("1 CHF to CNY", "numeric", "80. 1 CHF to CNY → numeric");
+
+                // Mixed-unit expressions tests
+                this.addTest("5mi + 3km in km", "≈11.046", "81. 5mi + 3km in km → ≈11.046");
+                this.addTest("10lb - 2kg in g", "≈2535.9237", "82. 10lb - 2kg in g → ≈2535.9237");
+                this.addTest("2 cups + 500ml in liters", "≈0.973176", "83. 2 cups + 500ml in liters → ≈0.973176");
+                this.addTest("1 day + 12 hours in minutes", "2160", "84. 1 day + 12 hours in minutes → 2160");
+                this.addTest("3 ft * 2 ft in m²", "≈0.55741824", "85. 3 ft * 2 ft in m² → ≈0.55741824");
+                this.addTest("(5km - 300m) in km", "4.7", "86. (5km - 300m) in km → 4.7");
+                this.addTest("(2 * (3 ft + 6 in)) in m", "≈2.1336", "87. (2 * (3 ft + 6 in)) in m → ≈2.1336");
+
+                // Plurals, aliases, normalization tests
+                this.addTest("10 lbs in kg", "≈4.5359", "88. 10 lbs in kg → ≈4.5359");
+                this.addTest("2 hours in minutes", "120", "89. 2 hours in minutes → 120");
+                this.addTest("500 ml in liters", "0.5", "90. 500 ml in liters → 0.5");
+                this.addTest("5 metres in ft", "≈16.4042", "91. 5 metres in ft → ≈16.4042");
+                this.addTest("5 meters in ft", "≈16.4042", "92. 5 meters in ft → ≈16.4042");
+                this.addTest("12 inches in cm", "30.48", "93. inches to cm with specific: 12 inches in cm → 30.48");
+                this.addTest("2 gallons in L", "7.570823568", "94. gallons in L with plural: 2 gallons in L → 7.570823568");
+
+                // Parsing & formatting quirks tests
+                this.addTest("10lb-2kg in g", "≈2535.9237", "95. 10lb-2kg in g (no spaces) → ≈2535.9237");
+                this.addTest("1/2 cup in tbsp", "8", "96. 1/2 cup in tbsp → 8");
+                this.addTest("1 1/2 cup in ml", "≈354.882", "97. 1 1/2 cup in ml → ≈354.882");
+                this.addTest("5 mi in km", "≈8.04672", "98. 5 mi in km (lower/upper mix doesn't matter) → ≈8.04672");
+                this.addTest(" 2   km   in   m ", "2000", "99.  2   km   in   m  (extra spaces) → 2000");
+                this.addTest("0x10+0x10 in decimal", "32", "100. 0x10+0x10 in decimal → 32");
+
+                // Error handling tests
+                this.addTest("5 m + 3 s", "❌", "101. 5 m + 3 s → ❌ \"dimensions are incompatible\"");
+                this.addTest("10 grmas in g", "❌", "102. 10 grmas in g → ❌ \"unknown unit: grmas\"");
+                this.addTest("5 ** 2", "❌", "103. 5 ** 2 → ❌ \"unexpected token/operator\"");
+                this.addTest("sin()", "❌", "104. sin() → ❌ \"bad function call\"");
+                this.addTest("pow(2,)", "❌", "105. pow(2,) → ❌ \"bad function args\"");
+                this.addTest("factorial(-5)", "❌", "106. factorial(-5) → ❌ or NaN (not allowed)");
+                this.addTest("factorial(5000)", "❌", "107. factorial(5000) → ❌/overflow guard");
+                this.addTest("100 USD to ABC", "❌", "108. 100 USD to ABC → ❌ \"unknown currency\"");
+                this.addTest("hello world", "❌", "109. hello world → ❌ (not a calc expression)");
+                this.addTest("", "no result", "110. empty input `` → no result (null/skip)");
+
+                // Regression checks tests
+                this.addTest("0xFF in decimal", "255", "111. parseNumberWithBase prefixes: 0xFF in decimal → 255");
+                this.addTest("0o10 + 8 in decimal", "16", "112. 0o10 + 8 in decimal → 16");
+                this.addTest("0b1010 + 10 in hex", "0x14", "113. 0b1010 + 10 in hex → 0x14");
+                this.addTest("10 + 0xA + 0b1010 in hex", "0x1E", "114. 10 + 0xA + 0b1010 in hex (again) → 0x1E");
+                this.addTest("5 litres in m", "5 m", "115. units normalization again: litres/metres/lbs inputs all work");
+                this.addTest("120 s in minutes", "2", "116. minutes target plural: 120 s in minutes → 2");
+                this.addTest("2 hours in s", "7200", "117. hours source plural: 2 hours in s → 7200");
+                this.addTest("2 cups in ml", "≈473.176", "118. cups plural source: 2 cups in ml → ≈473.176");
+                this.addTest("0x10+0x10 in hex", "0x20", "119. no-space hex: 0x10+0x10 in hex → 0x20");
+                this.addTest("(2+3)*4 in decimal", "20", "120. parentheses precedence: (2+3)*4 in decimal → 20");
+                
+                // Additional comprehensive tests
+                this.addTest("1 m in cm", "100", "121. 1 m in cm → 100");
+                this.addTest("1 km in m", "1000", "122. 1 km in m → 1000");
+                this.addTest("1 mi in km", "≈1.609344", "123. 1 mi in km → ≈1.609344");
+                this.addTest("1 yd in m", "≈0.9144", "124. 1 yd in m → ≈0.9144");
+                this.addTest("1 ft in m", "≈0.3048", "125. 1 ft in m → ≈0.3048");
+                this.addTest("1 in in cm", "2.54", "126. 1 in in cm → 2.54");
+                this.addTest("1 mm in cm", "0.1", "127. 1 mm in cm → 0.1");
+                this.addTest("1 cm in mm", "10", "128. 1 cm in mm → 10");
+                this.addTest("1 m in mm", "1000", "129. 1 m in mm → 1000");
+                this.addTest("1 km in cm", "100000", "130. 1 km in cm → 100000");
+                this.addTest("1 mi in m", "≈1609.344", "131. 1 mi in m → ≈1609.344");
+                this.addTest("1 yd in ft", "3", "132. 1 yd in ft → 3");
+                this.addTest("1 ft in in", "12", "133. 1 ft in in → 12");
+                this.addTest("1 m in ft", "≈3.28084", "134. 1 m in ft → ≈3.28084");
+                this.addTest("1 cm in in", "≈0.393701", "135. 1 cm in in → ≈0.393701");
+                this.addTest("1 mm in in", "≈0.0393701", "136. 1 mm in in → ≈0.0393701");
+                this.addTest("1 in in mm", "25.4", "137. 1 in in mm → 25.4");
+                this.addTest("1 ft in cm", "30.48", "138. 1 ft in cm → 30.48");
+                this.addTest("1 yd in cm", "91.44", "139. 1 yd in cm → 91.44");
+                this.addTest("1 mi in ft", "5280", "140. 1 mi in ft → 5280");
+                this.addTest("1 mi in yd", "1760", "141. 1 mi in yd → 1760");
+                this.addTest("1 km in ft", "≈3280.84", "142. 1 km in ft → ≈3280.84");
+                this.addTest("1 km in yd", "≈1093.61", "143. 1 km in yd → ≈1093.61");
+                this.addTest("1 m in yd", "≈1.09361", "144. 1 m in yd → ≈1.09361");
+                this.addTest("1 cm in yd", "≈0.0109361", "145. 1 cm in yd → ≈0.0109361");
+                this.addTest("1 mm in yd", "≈0.00109361", "146. 1 mm in yd → ≈0.00109361");
+                this.addTest("1 in in yd", "≈0.0277778", "147. 1 in in yd → ≈0.0277778");
+                this.addTest("1 ft in yd", "≈0.333333", "148. 1 ft in yd → ≈0.333333");
+                this.addTest("1 yd in mi", "≈0.000568182", "149. 1 yd in mi → ≈0.000568182");
+                this.addTest("1 ft in mi", "≈0.000189394", "150. 1 ft in mi → ≈0.000189394");
+                this.addTest("1 in in mi", "≈0.0000157828", "151. 1 in in mi → ≈0.0000157828");
+                this.addTest("1 cm in mi", "≈0.00000621371", "152. 1 cm in mi → ≈0.00000621371");
+                this.addTest("1 m in mi", "≈0.000621371", "153. 1 m in mi → ≈0.000621371");
+                this.addTest("1 km in mi", "≈0.621371", "154. 1 km in mi → ≈0.621371");
+                this.addTest("1 mm in mi", "≈0.000000621371", "155. 1 mm in mi → ≈0.000000621371");
+                this.addTest("1 in in km", "≈0.0000254", "156. 1 in in km → ≈0.0000254");
+                this.addTest("1 ft in km", "≈0.0003048", "157. 1 ft in km → ≈0.0003048");
+                this.addTest("1 yd in km", "≈0.0009144", "158. 1 yd in km → ≈0.0009144");
+                this.addTest("1 cm in km", "0.00001", "159. 1 cm in km → 0.00001");
+                this.addTest("1 mm in km", "0.000001", "160. 1 mm in km → 0.000001");
+                this.addTest("1 m² in cm²", "10000", "161. 1 m² in cm² → 10000");
+                this.addTest("1 m² in mm²", "1000000", "162. 1 m² in mm² → 1000000");
+                this.addTest("1 km² in m²", "1000000", "163. 1 km² in m² → 1000000");
+                this.addTest("1 cm² in mm²", "100", "164. 1 cm² in mm² → 100");
+                this.addTest("1 ft² in in²", "144", "165. 1 ft² in in² → 144");
+                this.addTest("1 yd² in ft²", "9", "166. 1 yd² in ft² → 9");
+                this.addTest("1 mi² in ft²", "27878400", "167. 1 mi² in ft² → 27878400");
+                this.addTest("1 mi² in yd²", "3097600", "168. 1 mi² in yd² → 3097600");
+                this.addTest("1 mi² in m²", "≈2589988.110336", "169. 1 mi² in m² → ≈2589988.110336");
+                this.addTest("1 mi² in km²", "≈2.589988", "170. 1 mi² in km² → ≈2.589988");
+                this.addTest("1 acre in ft²", "43560", "171. 1 acre in ft² → 43560");
+                this.addTest("1 acre in yd²", "4840", "172. 1 acre in yd² → 4840");
+                this.addTest("1 acre in m²", "≈4046.8564224", "173. 1 acre in m² → ≈4046.8564224");
+                this.addTest("1 ha in m²", "10000", "174. 1 ha in m² → 10000");
+                this.addTest("1 ha in km²", "0.01", "175. 1 ha in km² → 0.01");
+                this.addTest("1 L in ml", "1000", "176. 1 L in ml → 1000");
+                this.addTest("1 L in cm³", "1000", "177. 1 L in cm³ → 1000");
+                this.addTest("1 ml in cm³", "1", "178. 1 ml in cm³ → 1");
+                this.addTest("1 m³ in L", "1000", "179. 1 m³ in L → 1000");
+                this.addTest("1 m³ in ml", "1000000", "180. 1 m³ in ml → 1000000");
+                this.addTest("1 cm³ in ml", "1", "181. 1 cm³ in ml → 1");
+                this.addTest("1 gal in qt", "4", "182. 1 gal in qt → 4");
+                this.addTest("1 qt in pt", "2", "183. 1 qt in pt → 2");
+                this.addTest("1 pt in fl-oz", "16", "184. 1 pt in fl-oz → 16");
+                this.addTest("1 cup in fl-oz", "8", "185. 1 cup in fl-oz → 8");
+                this.addTest("1 tbsp in tsp", "3", "186. 1 tbsp in tsp → 3");
+                this.addTest("1 fl-oz in tbsp", "2", "187. 1 fl-oz in tbsp → 2");
+                this.addTest("1 cup in tbsp", "16", "188. 1 cup in tbsp → 16");
+                this.addTest("1 cup in tsp", "48", "189. 1 cup in tsp → 48");
+                this.addTest("1 qt in cups", "4", "190. 1 qt in cups → 4");
+                this.addTest("1 gal in cups", "16", "191. 1 gal in cups → 16");
+                this.addTest("1 gal in pt", "8", "192. 1 gal in pt → 8");
+                this.addTest("1 gal in fl-oz", "128", "193. 1 gal in fl-oz → 128");
+                this.addTest("1 gal in tbsp", "256", "194. 1 gal in tbsp → 256");
+                this.addTest("1 gal in tsp", "768", "195. 1 gal in tsp → 768");
+                this.addTest("1 L in cups", "≈4.22675", "196. 1 L in cups → ≈4.22675");
+                this.addTest("1 L in tbsp", "≈67.628", "197. 1 L in tbsp → ≈67.628");
+                this.addTest("1 L in tsp", "≈202.884", "198. 1 L in tsp → ≈202.884");
+                this.addTest("1 m³ in gal", "≈264.172", "199. 1 m³ in gal → ≈264.172");
+                this.addTest("1 m³ in qt", "≈1056.69", "200. 1 m³ in qt → ≈1056.69");
+                this.addTest("1 m³ in pt", "≈2113.38", "201. 1 m³ in pt → ≈2113.38");
+                this.addTest("1 m³ in cups", "≈4226.75", "202. 1 m³ in cups → ≈4226.75");
+                this.addTest("1 m³ in fl-oz", "≈33814", "203. 1 m³ in fl-oz → ≈33814");
+                this.addTest("1 m³ in tbsp", "≈67628", "204. 1 m³ in tbsp → ≈67628");
+                this.addTest("1 m³ in tsp", "≈202884", "205. 1 m³ in tsp → ≈202884");
+                this.addTest("1 cm³ in fl-oz", "≈0.033814", "206. 1 cm³ in fl-oz → ≈0.033814");
+                this.addTest("1 cm³ in tbsp", "≈0.067628", "207. 1 cm³ in tbsp → ≈0.067628");
+                this.addTest("1 cm³ in tsp", "≈0.202884", "208. 1 cm³ in tsp → ≈0.202884");
+                this.addTest("1 ml in fl-oz", "≈0.033814", "209. 1 ml in fl-oz → ≈0.033814");
+                this.addTest("1 ml in tbsp", "≈0.067628", "210. 1 ml in tbsp → ≈0.067628");
+                this.addTest("1 ml in tsp", "≈0.202884", "211. 1 ml in tsp → ≈0.202884");
+                this.addTest("1 fl-oz in ml", "≈29.5735", "212. 1 fl-oz in ml → ≈29.5735");
+                this.addTest("1 tbsp in ml", "≈14.7868", "213. 1 tbsp in ml → ≈14.7868");
+                this.addTest("1 tsp in ml", "≈4.92892", "214. 1 tsp in ml → ≈4.92892");
+                this.addTest("1 cup in ml", "≈236.588", "215. 1 cup in ml → ≈236.588");
+                this.addTest("1 pt in ml", "≈473.176", "216. 1 pt in ml → ≈473.176");
+                this.addTest("1 qt in ml", "≈946.353", "217. 1 qt in ml → ≈946.353");
+                this.addTest("1 gal in ml", "≈3785.41", "218. 1 gal in ml → ≈3785.41");
+                this.addTest("1 kg in g", "1000", "219. 1 kg in g → 1000");
+                this.addTest("1 g in mg", "1000", "220. 1 g in mg → 1000");
+                this.addTest("1 mg in µg", "1000", "221. 1 mg in µg → 1000");
+                this.addTest("1 µg in ng", "1000", "222. 1 µg in ng → 1000");
+                this.addTest("1 ng in pg", "1000", "223. 1 ng in pg → 1000");
+                this.addTest("1 lb in oz", "16", "224. 1 lb in oz → 16");
+                this.addTest("1 oz in dr", "16", "225. 1 oz in dr → 16");
+                this.addTest("1 dr in gr", "27.34375", "226. 1 dr in gr → 27.34375");
+                this.addTest("1 gr in mg", "≈64.7989", "227. 1 gr in mg → ≈64.7989");
+                this.addTest("1 lb in gr", "7000", "228. 1 lb in gr → 7000");
+                this.addTest("1 oz in gr", "437.5", "229. 1 oz in gr → 437.5");
+                this.addTest("1 dr in mg", "≈1771.85", "230. 1 dr in mg → ≈1771.85");
+                this.addTest("1 st in lb", "14", "231. 1 st in lb → 14");
+                this.addTest("1 st in oz", "224", "232. 1 st in oz → 224");
+                this.addTest("1 st in kg", "≈6.35029", "233. 1 st in kg → ≈6.35029");
+                this.addTest("1 st in g", "≈6350.29", "234. 1 st in g → ≈6350.29");
+                this.addTest("1 ton in lb", "2000", "235. 1 ton in lb → 2000");
+                this.addTest("1 ton in oz", "32000", "236. 1 ton in oz → 32000");
+                this.addTest("1 ton in st", "≈142.857", "237. 1 ton in st → ≈142.857");
+                this.addTest("1 ton in kg", "≈907.185", "238. 1 ton in kg → ≈907.185");
+                this.addTest("1 ton in g", "≈907185", "239. 1 ton in g → ≈907185");
+                this.addTest("1 metric-ton in lb", "≈2204.62", "240. 1 metric-ton in lb → ≈2204.62");
+                this.addTest("1 metric-ton in oz", "≈35273.9", "241. 1 metric-ton in oz → ≈35273.9");
+                this.addTest("1 metric-ton in st", "≈157.473", "242. 1 metric-ton in st → ≈157.473");
+                this.addTest("1 metric-ton in ton", "≈1.10231", "243. 1 metric-ton in ton → ≈1.10231");
+                this.addTest("1 kg in lb", "≈2.20462", "244. 1 kg in lb → ≈2.20462");
+                this.addTest("1 kg in oz", "≈35.274", "245. 1 kg in oz → ≈35.274");
+                this.addTest("1 kg in st", "≈0.157473", "246. 1 kg in st → ≈0.157473");
+                this.addTest("1 kg in ton", "≈0.00110231", "247. 1 kg in ton → ≈0.00110231");
+                this.addTest("1 g in lb", "≈0.00220462", "248. 1 g in lb → ≈0.00220462");
+                this.addTest("1 g in oz", "≈0.035274", "249. 1 g in oz → ≈0.035274");
+                this.addTest("1 g in st", "≈0.000157473", "250. 1 g in st → ≈0.000157473");
+                this.addTest("1 g in ton", "≈0.00000110231", "251. 1 g in ton → ≈0.00000110231");
+                this.addTest("1 mg in lb", "≈0.00000220462", "252. 1 mg in lb → ≈0.00000220462");
+                this.addTest("1 mg in oz", "≈0.000035274", "253. 1 mg in oz → ≈0.000035274");
+                this.addTest("1 mg in st", "≈0.000000157473", "254. 1 mg in st → ≈0.000000157473");
+                this.addTest("1 mg in ton", "≈0.00000000110231", "255. 1 mg in ton → ≈0.00000000110231");
+                this.addTest("1 µg in lb", "≈0.00000000220462", "256. 1 µg in lb → ≈0.00000000220462");
+                this.addTest("1 µg in oz", "≈0.000000035274", "257. 1 µg in oz → ≈0.000000035274");
+                this.addTest("1 µg in st", "≈0.000000000157473", "258. 1 µg in st → ≈0.000000000157473");
+                this.addTest("1 µg in ton", "≈0.00000000000110231", "259. 1 µg in ton → ≈0.00000000000110231");
+                this.addTest("1 ng in lb", "≈0.00000000000220462", "260. 1 ng in lb → ≈0.00000000000220462");
+                this.addTest("1 ng in oz", "≈0.000000000035274", "261. 1 ng in oz → ≈0.000000000035274");
+                this.addTest("1 ng in st", "≈0.000000000000157473", "262. 1 ng in st → ≈0.000000000000157473");
+                this.addTest("1 ng in ton", "≈0.00000000000000110231", "263. 1 ng in ton → ≈0.00000000000000110231");
+                this.addTest("1 pg in lb", "≈0.00000000000000220462", "264. 1 pg in lb → ≈0.00000000000000220462");
+                this.addTest("1 pg in oz", "≈0.000000000000035274", "265. 1 pg in oz → ≈0.000000000000035274");
+                this.addTest("1 pg in st", "≈0.000000000000000157473", "266. 1 pg in st → ≈0.000000000000000157473");
+                this.addTest("1 pg in ton", "≈0.00000000000000000110231", "267. 1 pg in ton → ≈0.00000000000000000110231");
+                this.addTest("1 lb in mg", "≈453592", "268. 1 lb in mg → ≈453592");
+                this.addTest("1 oz in mg", "≈28349.5", "269. 1 oz in mg → ≈28349.5");
+                this.addTest("1 st in mg", "≈6350290", "270. 1 st in mg → ≈6350290");
+                this.addTest("1 ton in mg", "≈907185000", "271. 1 ton in mg → ≈907185000");
+                this.addTest("1 metric-ton in mg", "1000000000", "272. 1 metric-ton in mg → 1000000000");
+                this.addTest("1 lb in µg", "≈453592000", "273. 1 lb in µg → ≈453592000");
+                this.addTest("1 oz in µg", "≈28349500", "274. 1 oz in µg → ≈28349500");
+                this.addTest("1 st in µg", "≈6350290000", "275. 1 st in µg → ≈6350290000");
+                this.addTest("1 ton in µg", "≈907185000000", "276. 1 ton in µg → ≈907185000000");
+                this.addTest("1 metric-ton in µg", "1000000000000", "277. 1 metric-ton in µg → 1000000000000");
+                this.addTest("1 lb in ng", "≈453592000000", "278. 1 lb in ng → ≈453592000000");
+                this.addTest("1 oz in ng", "≈28349500000", "279. 1 oz in ng → ≈28349500000");
+                this.addTest("1 st in ng", "≈6350290000000", "280. 1 st in ng → ≈6350290000000");
+                this.addTest("1 ton in ng", "≈907185000000000", "281. 1 ton in ng → ≈907185000000000");
+                this.addTest("1 metric-ton in ng", "1000000000000000", "282. 1 metric-ton in ng → 1000000000000000");
+                this.addTest("1 lb in pg", "≈453592000000000", "283. 1 lb in pg → ≈453592000000000");
+                this.addTest("1 oz in pg", "≈28349500000000", "284. 1 oz in pg → ≈28349500000000");
+                this.addTest("1 st in pg", "≈6350290000000000", "285. 1 st in pg → ≈6350290000000000");
+                this.addTest("1 ton in pg", "≈907185000000000000", "286. 1 ton in pg → ≈907185000000000000");
+                this.addTest("1 metric-ton in pg", "1000000000000000000", "287. 1 metric-ton in pg → 1000000000000000000");
+                this.addTest("1 s in ms", "1000", "288. 1 s in ms → 1000");
+                this.addTest("1 ms in µs", "1000", "289. 1 ms in µs → 1000");
+                this.addTest("1 µs in ns", "1000", "290. 1 µs in ns → 1000");
+                this.addTest("1 ns in ps", "1000", "291. 1 ns in ps → 1000");
+                this.addTest("1 ps in fs", "1000", "292. 1 ps in fs → 1000");
+                this.addTest("1 fs in as", "1000", "293. 1 fs in as → 1000");
+                this.addTest("1 min in s", "60", "294. 1 min in s → 60");
+                this.addTest("1 h in min", "60", "295. 1 h in min → 60");
+                this.addTest("1 day in h", "24", "296. 1 day in h → 24");
+                this.addTest("1 week in days", "7", "297. 1 week in days → 7");
+                this.addTest("1 month in days", "≈30", "298. 1 month in days → ≈30");
+                
+                // Additional comprehensive tests from user
+                this.addTest("1234 mm in ft", "≈4.0499", "299. 1234 mm in ft → ≈4.0499");
+                this.addTest("2.5 km - 1200 m in m", "1300", "300. 2.5 km - 1200 m in m → 1300");
+                this.addTest("8 yd in m", "≈7.3152", "301. 8 yd in m → ≈7.3152");
+                this.addTest("6' 2\" in cm", "≈187.96", "302. 6' 2\" in cm (if your parser supports '/\") → ≈187.96");
+                this.addTest("1 parsec in ly", "≈3.26156", "303. 1 parsec in ly → ≈3.26156");
+                this.addTest("250000 angstrom in nm", "25", "304. 250000 angstrom in nm → 25");
+                this.addTest("3 micrometer in nm", "3000", "305. 3 micrometer in nm → 3000");
+                this.addTest("0.5 mile in ft", "2640", "306. 0.5 mile in ft → 2640");
+                this.addTest("2.2 metre in inches", "≈86.6142", "307. 2.2 metre in inches → ≈86.6142");
+                this.addTest("15 in in m", "0.381", "308. 15 in in m → 0.381");
+                this.addTest("1 acre in ft²", "43560", "309. 1 acre in ft² → 43560");
+                this.addTest("2500 cm² in m²", "0.25", "310. 2500 cm² in m² → 0.25");
+                this.addTest("0.5 km² in ha", "50", "311. 0.5 km² in ha → 50");
+                this.addTest("1000 in² in ft²", "6.9444", "312. 1000 in² in ft² → 6.9444");
+                this.addTest("1 ha in m²", "10000", "313. 1 ha in m² → 10000");
+                this.addTest("946 ml in qt", "≈1", "314. 946 ml in qt → ≈1");
+                this.addTest("355 ml in fl-oz", "≈12", "315. 355 ml in fl-oz → ≈12");
+                this.addTest("1.5 L in cups", "≈6.3401", "316. 1.5 L in cups → ≈6.3401");
+                this.addTest("3 tbsp in tsp", "9", "317. 3 tbsp in tsp → 9");
+                this.addTest("2 quarts in liters", "≈1.892705", "318. 2 quarts in liters → ≈1.892705");
+                this.addTest("0.75 litre in pint", "≈1.5850", "319. 0.75 litre in pint → ≈1.5850");
+                this.addTest("1 cc in ml", "1", "320. 1 cc in ml → 1");
+                this.addTest("750 ml + 1 cup in L", "≈0.9866", "321. 750 ml + 1 cup in L → ≈0.9866");
+                this.addTest("2 pint + 1 qt in gal", "0.5", "322. 2 pint + 1 qt in gal → 0.5");
+                this.addTest("5 lb 8 oz in kg", "≈2.49476", "323. 5 lb 8 oz in kg → ≈2.49476");
+                this.addTest("2 stone in kg", "≈12.70058636", "324. 2 stone in kg → ≈12.70058636");
+                this.addTest("2000 mg in g", "2", "325. 2000 mg in g → 2");
+                this.addTest("0.25 kg in oz", "≈8.81849", "326. 0.25 kg in oz → ≈8.81849");
+                this.addTest("1 tonne in short-ton", "≈1.10231", "327. 1 tonne in short-ton → ≈1.10231");
+                this.addTest("14.6 lb in g", "≈6622.5966", "328. 14.6 lb in g → ≈6622.5966");
+                this.addTest("3 carat in g", "0.6", "329. 3 carat in g → 0.6");
+                this.addTest("90 min in s", "5400", "330. 90 min in s → 5400");
+                this.addTest("1.5 h in min", "90", "331. 1.5 h in min → 90");
+                this.addTest("2 weeks in hours", "336", "332. 2 weeks in hours → 336");
+                this.addTest("3 months in days", "≈90", "333. 3 months in days (your approximation) → ≈90");
+                this.addTest("1 year in hours", "8760", "334. 1 year in hours → 8760 (if 365-day basis)");
+                this.addTest("3 days - 12 hours in minutes", "3600", "335. 3 days - 12 hours in minutes → 3600");
+                this.addTest("2500 ms in s", "2.5", "336. 2500 ms in s → 2.5");
+                this.addTest("30 m/s in mph", "≈67.1089", "337. 30 m/s in mph → ≈67.1089");
+                this.addTest("60 mph in km/h", "≈96.5606", "338. 60 mph in km/h → ≈96.5606");
+                this.addTest("10 ft/s in m/s", "≈3.048", "339. 10 ft/s in m/s → ≈3.048");
+                this.addTest("100 km/h in mi/h", "≈62.1371", "340. 100 km/h in mi/h → ≈62.1371");
+                this.addTest("-40 F to C", "-40 C", "341. -40 F to C → -40 C");
+                this.addTest("0 K to C", "-273.15 C", "342. 0 K to C → -273.15 C");
+                this.addTest("20 C to R", "527.67 R", "343. 20 C to R → 527.67 R");
+                this.addTest("451 F to K", "≈505.372 K", "344. 451 F to K → ≈505.372 K");
+                this.addTest("0x20 + 16 in binary", "0b100000", "345. 0x20 + 16 in binary → 0b100000");
+                this.addTest("0b1111 + 0o7 in hex", "0x16", "346. 0b1111 + 0o7 in hex → 0x16");
+                this.addTest("255 in hex", "0xFF", "347. 255 in hex → 0xFF");
+                this.addTest("0o377 - 0x1F in decimal", "224", "348. 0o377 - 0x1F in decimal → 224");
+                this.addTest("10 + 0xA - 0b11 in octal", "0o23", "349. 10 + 0xA - 0b11 in octal → 0o23");
+                this.addTest("sin(0)", "0", "350. sin(0) → 0");
+                this.addTest("cos(pi)", "-1", "351. cos(pi) → -1");
+                this.addTest("tan(pi/4)", "≈1", "352. tan(pi/4) (if / inside works) → ≈1");
+                this.addTest("log(1e3)", "3", "353. log(1e3) → 3");
+                this.addTest("ln(e)", "1", "354. ln(e) → 1");
+                this.addTest("sqrt(2) * sqrt(2)", "2", "355. sqrt(2) * sqrt(2) → 2");
+                this.addTest("pow(9,0.5)", "3", "356. pow(9,0.5) → 3");
+                this.addTest("round(2.5000)", "3", "357. round(2.5000) → 3");
+                this.addTest("factorial(12)", "479001600", "358. factorial(12) → 479001600");
+                this.addTest("factorial(170)", "finite number", "359. factorial(170) → finite number (max safe)");
+                this.addTest("abs(-0.001)", "0.001", "360. abs(-0.001) → 0.001");
+                this.addTest("2*pi", "≈6.283185307", "361. 2*pi → ≈6.283185307");
+                this.addTest("c / 1e6", "≈299.792458", "362. c / 1e6 → ≈299.792458");
+                this.addTest("h * c", "≈1.98644586e-25", "363. h * c → ≈1.98644586e-25");
+                this.addTest("phi^2 - phi", "1", "364. phi^2 - phi → 1 (golden ratio identity)");
+                this.addTest("R / NA", "≈1.380649e-23", "365. R / NA → ≈1.380649e-23 (Boltzmann k)");
+                this.addTest("123.45 USD to JPY", "numeric", "366. 123.45 USD to JPY → numeric (no crash)");
+                this.addTest("999 EUR to CHF", "numeric", "367. 999 EUR to CHF → numeric");
+                this.addTest("1 CNY to GBP", "numeric", "368. 1 CNY to GBP → numeric");
+                this.addTest("2 hours in minute", "120", "369. 2 hours in minute → 120");
+                this.addTest("750 millilitres in cup", "≈3.1701", "370. 750 millilitres in cup → ≈3.1701");
+                this.addTest("10 lbs in kilogram", "≈4.5359237", "371. 10 lbs in kilogram → ≈4.5359237");
+                this.addTest("12 inches in metre", "0.3048", "372. 12 inches in metre → 0.3048");
+                this.addTest("2 gallons in litre", "≈7.570823568", "373. 2 gallons in litre → ≈7.570823568");
+                this.addTest("3 metres in yard", "≈3.28084", "374. 3 metres in yard → ≈3.28084");
+                this.addTest("500 milligram in g", "0.5", "375. 500 milligram in g → 0.5");
+                this.addTest("5km-300m in m", "4700", "376. 5km-300m in m → 4700");
+                this.addTest("2 cups + 3 tbsp in ml", "≈517.537", "377. 2 cups + 3 tbsp in ml → ≈517.537");
+                this.addTest("10lb-2kg in g", "≈2535.9237", "378. 10lb-2kg in g → ≈2535.9237");
+                this.addTest("1/3 cup in tbsp", "≈5.3333", "379. 1/3 cup in tbsp → ≈5.3333");
+                this.addTest("0x10+0x1 in decimal", "17", "380. 0x10+0x1 in decimal → 17");
+                this.addTest("5 metre in in", "≈196.8504", "381. 5 metre in in (inches) → ≈196.8504");
+                this.addTest("2 ft in in", "24", "382. 2 ft in in → 24");
+                this.addTest("1 mi + 500 m in km", "≈2.10934", "383. 1 mi + 500 m in km → ≈2.10934");
+                this.addTest("3 qt + 1 pint in L", "≈3.313", "384. 3 qt + 1 pint in L → ≈3.313");
+                this.addTest("2 day + 6 h in hours", "54", "385. 2 day + 6 h in hours → 54");
+                this.addTest("1 lb + 8 oz in kg", "≈0.680389", "386. 1 lb + 8 oz in kg → ≈0.680389");
+                this.addTest("4 cup - 250 ml in tbsp", "≈47.093", "387. 4 cup - 250 ml in tbsp → ≈47.093");
+                this.addTest("5 m + 4 s", "❌", "388. 5 m + 4 s → error (incompatible dimensions)");
+                this.addTest("10 grm in g", "❌", "389. 10 grm in g → error (unknown unit; suggests \"gram\")");
+                this.addTest("pow(2,)", "❌", "390. pow(2,) → error (bad args)");
+                this.addTest("factorial(-1)", "❌", "391. factorial(-1) → error/NaN");
+                this.addTest("0b102 in decimal", "❌", "392. 0b102 in decimal → error (invalid binary)");
+                this.addTest("100 ABC to USD", "❌", "393. 100 ABC to USD → error (unknown currency)");
+                this.addTest("sin()", "❌", "394. sin() → error");
+                this.addTest("infinite loop?", "❌", "395. infinite loop? (plain text) → error / no result");
+            }
+
+            addTest(input, expected, description) {
+                this.tests.push({
+                    input: input,
+                    expected: expected,
+                    description: description
+                });
+            }
+
+            async runTest(test) {
+                try {
+                    const result = unitsJsCalc(test.input);
+                    
+                    // Handle special cases
+                    if (test.expected === "❌") {
+                        // Should fail gracefully
+                        return result === null ? "PASS" : "FAIL";
+                    }
+                    
+                    if (test.expected === "no result") {
+                        return result === null ? "PASS" : "FAIL";
+                    }
+                    
+                    if (test.expected === "numeric") {
+                        // Just check if it's a number
+                        return result && !isNaN(parseFloat(result)) ? "PASS" : "FAIL";
+                    }
+                    
+                    if (test.expected === "finite number") {
+                        // Check if it's a finite number
+                        const num = parseFloat(result);
+                        return result && isFinite(num) && !isNaN(num) ? "PASS" : "FAIL";
+                    }
+                    
+                    if (test.expected === "NaN/error") {
+                        // Should return NaN or error
+                        const num = parseFloat(result);
+                        return result === null || isNaN(num) ? "PASS" : "FAIL";
+                    }
+                    
+                    // Handle approximate matches
+                    if (test.expected.startsWith("≈")) {
+                        const expectedNum = parseFloat(test.expected.substring(1));
+                        const actualNum = parseFloat(result);
+                        if (isNaN(expectedNum) || isNaN(actualNum)) {
+                            return "FAIL";
+                        }
+                        // Allow 1% tolerance for approximate matches
+                        const tolerance = Math.abs(expectedNum * 0.01);
+                        return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
+                    }
+                    
+                    // Handle scientific notation
+                    if (test.expected.includes("e")) {
+                        const expectedNum = parseFloat(test.expected);
+                        const actualNum = parseFloat(result);
+                        if (isNaN(expectedNum) || isNaN(actualNum)) {
+                            return "FAIL";
+                        }
+                        // Allow 1% tolerance for scientific notation
+                        const tolerance = Math.abs(expectedNum * 0.01);
+                        return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
+                    }
+                    
+                    // Exact match
+                    if (test.expected.includes("0x") || test.expected.includes("0o") || test.expected.includes("0b")) {
+                        // Hex/octal/binary - exact match
+                        return result === test.expected ? "PASS" : "FAIL";
+                    }
+                    
+                    // Regular number comparison
+                    const expectedNum = parseFloat(test.expected);
+                    const actualNum = parseFloat(result);
+                    if (isNaN(expectedNum) || isNaN(actualNum)) {
+                        return "FAIL";
+                    }
+                    return Math.abs(actualNum - expectedNum) < 0.0001 ? "PASS" : "FAIL";
+                    
+                } catch (error) {
+                    return "ERROR";
+                }
+            }
+
+            async runAllTests() {
+                this.results = [];
+                this.currentTestIndex = 0;
+                
+                document.getElementById('total-tests').textContent = this.tests.length;
+                document.getElementById('test-results').innerHTML = '';
+                
+                for (let i = 0; i < this.tests.length; i++) {
+                    const test = this.tests[i];
+                    const result = await this.runTest(test);
+                    this.results.push({ test, result });
+                    
+                    // Update progress
+                    this.currentTestIndex = i + 1;
+                    const progress = (this.currentTestIndex / this.tests.length) * 100;
+                    document.getElementById('progress-fill').style.width = progress + '%';
+                    
+                    // Add result to display
+                    this.addTestResult(test, result);
+                    
+                    // Small delay to prevent blocking
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+                
+                this.updateSummary();
+            }
+
+            addTestResult(test, result) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-item ${result.toLowerCase()}`;
+                
+                const status = result === 'PASS' ? '✅' : result === 'FAIL' ? '❌' : '⚠️';
+                const statusText = result === 'PASS' ? 'PASS' : result === 'FAIL' ? 'FAIL' : 'ERROR';
+                
+                resultDiv.innerHTML = `
+                    <div><strong>${status} ${statusText}</strong> - ${test.description}</div>
+                    <div class="test-input">Input: <code>${test.input}</code></div>
+                    <div class="test-expected">Expected: ${test.expected}</div>
+                    <div class="test-actual">Actual: ${unitsJsCalc(test.input) || 'null'}</div>
+                `;
+                
+                document.getElementById('test-results').appendChild(resultDiv);
+            }
+
+            updateSummary() {
+                const passed = this.results.filter(r => r.result === 'PASS').length;
+                const failed = this.results.filter(r => r.result === 'FAIL').length;
+                const errors = this.results.filter(r => r.result === 'ERROR').length;
+                const successRate = ((passed / this.tests.length) * 100).toFixed(1);
+                
+                document.getElementById('passed-tests').textContent = passed;
+                document.getElementById('failed-tests').textContent = failed;
+                document.getElementById('error-tests').textContent = errors;
+                document.getElementById('success-rate').textContent = successRate + '%';
+                
+                // Color code the summary
+                const summaryDiv = document.querySelector('.summary');
+                if (successRate >= 90) {
+                    summaryDiv.style.backgroundColor = '#e8f5e8';
+                } else if (successRate >= 70) {
+                    summaryDiv.style.backgroundColor = '#fff3e0';
+                } else {
+                    summaryDiv.style.backgroundColor = '#ffebee';
+                }
+            }
+        }
+
+        // Initialize test suite
+        const testSuite = new TestSuite();
+
+        // Global function to run all tests
+        function runAllTests() {
+            testSuite.runAllTests();
+        }
+
+        // Auto-run tests when page loads
+        window.addEventListener('load', () => {
+            // Small delay to ensure everything is loaded
+            setTimeout(() => {
+                runAllTests();
+            }, 500);
+        });
+    </script>
+</body>
+</html> 
