@@ -61,7 +61,7 @@ class AIErrorResolver {
                     'Authorization': `Bearer ${this.openRouterApiKey}`,
                     'Content-Type': 'application/json',
                     'HTTP-Referer': 'https://github.com/cloudy-calculator',
-                    'X-Title': 'AI Cloudy Calculator'
+                    'X-Title': 'Cloudy Calculator'
                 },
                 body: JSON.stringify({
                     model: this.modelName,

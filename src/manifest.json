@@ -1,7 +1,7 @@
 {
-	"name": "AI Cloudy Calculator",
+	"name": "Cloudy Calculator",
 	"version": "1.0.0",
-	"description": "An AI powered calculator. (Formerly Cloudy Calculator & Chromey Calculator)",
+	"description": "An Updated & Revived Cloudy Calculator",
 	"manifest_version": 3,
   
 	"icons": {
@@ -12,7 +12,7 @@
   
 	"action": {
 	  "default_icon": { "19": "icons/19.png" },
-	  "default_title": "AI Cloudy Calculator",
+	  "default_title": "Cloudy Calculator",
 	  "default_popup": "popup.html"
 	},
   

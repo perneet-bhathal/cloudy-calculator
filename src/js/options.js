@@ -1,4 +1,4 @@
-// AI Cloudy Calculator Options - Manifest V3 compatible
+// Cloudy Calculator Options - Manifest V3 compatible
 class OptionsManager {
     constructor() {
         this.defaultOptions = {
