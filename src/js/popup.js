@@ -5,7 +5,7 @@
 class AIErrorResolver {
     constructor() {
         // Get your free API key from https://openrouter.ai/keys
-        this.openRouterApiKey = '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'; 
+        this.openRouterApiKey = ' '; 
         this.modelName = 'deepseek/deepseek-chat-v3-0324:free';
         this.enabled = false;
         this.loadConfig();
