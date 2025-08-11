@@ -171,6 +171,26 @@ class CloudyCalculator {
                 'zoom', 'height', 'width', 'titleFont', 'headerLinksFont', 'resultFont', 'inputFont'
             ]);
             
+            // ===== Apply size options (width & height) =====
+            const calcWrapper = document.getElementById('calcWrapper');
+            if (calcWrapper) {
+                // Width
+                if (options.width) {
+                    let w = options.width.toString();
+                    if (!w.endsWith('px')) w += 'px';
+                    calcWrapper.style.width = w;
+                    // Also set body width so Chrome resizes the popup correctly
+                    document.body.style.width = w;
+                }
+                // Height
+                if (options.height) {
+                    let h = options.height.toString();
+                    if (!h.endsWith('px')) h += 'px';
+                    calcWrapper.style.height = h;
+                    document.body.style.height = h;
+                }
+            }
+            
             if (options.zoom) {
                 document.body.style.zoom = options.zoom;
             }
@@ -727,11 +747,16 @@ class CloudyCalculator {
     }
 
     openPopout() {
-        chrome.windows.create({
-            url: 'calc.html',
-            type: 'popup',
-            width: 500,
-            height: 500
+        // Create the pop-out window using stored width/height (fallback 500×500)
+        chrome.storage.local.get(['width', 'height'], (opts) => {
+            const w = opts.width ? (parseInt(opts.width) || 500) : 500;
+            const h = opts.height ? (parseInt(opts.height) || 500) : 500;
+            chrome.windows.create({
+                url: 'calc.html',
+                type: 'popup',
+                width: w,
+                height: h
+            });
         });
     }
 
