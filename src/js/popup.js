@@ -126,6 +126,24 @@ class CloudyCalculator {
         
         // Enhanced focus implementation
         this.ensureFocus();
+        
+        // Scroll to bottom to show most recent results
+        this.scrollToBottom();
+    }
+
+    /**
+     * Scrolls the history to the bottom to show the most recent results.
+     * This method is called:
+     * - When the popup is initialized
+     * - When the popup becomes visible again
+     * - When the popup gains focus
+     * - After loading state from storage
+     * - After adding new results
+     */
+    scrollToBottom() {
+        if (this.calcResultsWrapper) {
+            this.calcResultsWrapper.scrollTop = this.calcResultsWrapper.scrollHeight;
+        }
     }
 
     // New method: Robust focus implementation
@@ -141,13 +159,29 @@ class CloudyCalculator {
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) {
                 this.focusInput();
+                // Also scroll to bottom when popup becomes visible
+                this.scrollToBottom();
             }
         });
         
         // Focus when the window gains focus
         window.addEventListener('focus', () => {
             this.focusInput();
+            // Also scroll to bottom when popup gains focus
+            this.scrollToBottom();
         });
+        
+        // Handle popup show/hide events
+        window.addEventListener('pageshow', () => {
+            // Scroll to bottom when page is shown (popup reopened)
+            this.scrollToBottom();
+        });
+        
+        // Handle when popup becomes visible again
+        if (document.visibilityState !== 'hidden') {
+            // Popup is already visible, scroll to bottom
+            setTimeout(() => this.scrollToBottom(), 100);
+        }
     }
 
     // Helper method to focus the input with error handling
@@ -717,6 +751,10 @@ class CloudyCalculator {
 
     clearResults() {
         this.calcResults.innerHTML = '';
+        // Scroll to top when clearing results
+        if (this.calcResultsWrapper) {
+            this.calcResultsWrapper.scrollTop = 0;
+        }
     }
 
     // New method: Clear everything including variables and history
@@ -726,6 +764,11 @@ class CloudyCalculator {
         this.historyIndex = -1;
         this.variables = { '@': 0 }; // Reset to default state
         this.saveState(); // Save the cleared state
+        
+        // Scroll to top when clearing everything
+        if (this.calcResultsWrapper) {
+            this.calcResultsWrapper.scrollTop = 0;
+        }
     }
 
     // New method: Limit variables to prevent memory bloat
@@ -776,6 +819,8 @@ class CloudyCalculator {
             this.variables = state.variables || { '@': 0 };
             if (state.results) {
                 this.calcResults.innerHTML = state.results;
+                // Scroll to bottom after loading results to show most recent entries
+                setTimeout(() => this.scrollToBottom(), 0);
             }
             this.historyIndex = this.history.length;
         } catch (e) {

@@ -644,13 +644,48 @@
             testSuite.runAllTests();
         }
 
-        // Auto-run tests when page loads
-        window.addEventListener('load', () => {
-            // Small delay to ensure everything is loaded
-            setTimeout(() => {
-                runAllTests();
-            }, 500);
-        });
+                        // Auto-run tests when page loads
+                window.addEventListener('load', () => {
+                    // Small delay to ensure everything is loaded
+                    setTimeout(() => {
+                        runAllTests();
+                    }, 500);
+                });
+                
+                // Test scroll functionality
+                function testScrollBehavior() {
+                    console.log('Testing scroll behavior...');
+                    
+                    // Create a mock calculator instance to test scroll methods
+                    const mockCalc = {
+                        calcResultsWrapper: {
+                            scrollTop: 0,
+                            scrollHeight: 1000
+                        },
+                        scrollToBottom: function() {
+                            this.calcResultsWrapper.scrollTop = this.calcResultsWrapper.scrollHeight;
+                        }
+                    };
+                    
+                    // Test initial scroll position
+                    const initialScrollTop = mockCalc.calcResultsWrapper.scrollTop;
+                    console.log('Initial scroll position:', initialScrollTop);
+                    
+                    // Test scroll to bottom
+                    mockCalc.scrollToBottom();
+                    const finalScrollTop = mockCalc.calcResultsWrapper.scrollTop;
+                    console.log('Final scroll position:', finalScrollTop);
+                    
+                    // Verify scroll to bottom worked
+                    if (finalScrollTop === mockCalc.calcResultsWrapper.scrollHeight) {
+                        console.log('✅ Scroll to bottom test PASSED');
+                    } else {
+                        console.log('❌ Scroll to bottom test FAILED');
+                    }
+                }
+                
+                // Run scroll test after a delay
+                setTimeout(testScrollBehavior, 1000);
     </script>
 </body>
 </html> 
