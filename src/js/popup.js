@@ -122,6 +122,7 @@ class CloudyCalculator {
         
         await this.loadAndApplyOptions();
         this.setupEventListeners();
+        
         this.loadState();
         
         // Enhanced focus implementation
@@ -144,6 +145,32 @@ class CloudyCalculator {
         if (this.calcResultsWrapper) {
             this.calcResultsWrapper.scrollTop = this.calcResultsWrapper.scrollHeight;
         }
+    }
+    
+    /**
+     * Cleans up variables to ensure they contain valid numbers
+     */
+    cleanupVariables() {
+        for (const [name, value] of Object.entries(this.variables)) {
+            if (name === '@') continue; // @ is handled separately
+            
+            const numValue = parseFloat(value);
+            if (isNaN(numValue) || !isFinite(numValue)) {
+                // Remove invalid variables
+                delete this.variables[name];
+            } else {
+                // Ensure the value is stored as a number
+                this.variables[name] = numValue;
+            }
+        }
+    }
+    
+    /**
+     * Resets the @ variable to 0
+     */
+    resetLastResult() {
+        this.variables['@'] = 0;
+        this.saveState();
     }
 
     // New method: Robust focus implementation
@@ -265,6 +292,10 @@ class CloudyCalculator {
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 this.navigateHistory(1);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                this.resetLastResult();
+                this.calcInput.value = '';
             }
         });
 
@@ -396,18 +427,38 @@ class CloudyCalculator {
                 }
             }
 
+            // Handle expressions that start with operators (like *30, +20, etc.)
+            let expression = input;
+            if (/^[\+\-\*\/\^]/.test(input.trim())) {
+                // If input starts with an operator, prepend the last result
+                expression = '@' + input;
+            }
+            
             // Substitute variables and evaluate
-            let expression = this.substituteVariables(input);
+            expression = this.substituteVariables(expression);
             const result = this.evaluateExpression(expression);
             
-            // Store result as @
-            this.variables['@'] = result;
+            // ALWAYS store result as @ (ensure it's a valid number)
+            if (typeof result === 'number' && isFinite(result)) {
+                this.variables['@'] = result;
+            } else {
+                // If result is not a valid number, set @ to 0
+                this.variables['@'] = 0;
+            }
+            
             this.addResult(input, result);
             this.saveState();
 
         } catch (error) {
             // If we get here, both unit conversion and main parser failed
             this.addResult(input, 'Error: ' + error.message, 'error');
+            
+            // Don't update @ variable on error - keep the last valid result
+            // But ensure @ is still a valid number
+            if (typeof this.variables['@'] !== 'number' || !isFinite(this.variables['@'])) {
+                this.variables['@'] = 0;
+            }
+            
             this.saveState();
         }
 
@@ -426,7 +477,9 @@ class CloudyCalculator {
                 const unitsResult = unitsJsCalc(expression);
                 if (unitsResult) {
                     this.variables[varName] = unitsResult;
-                    this.variables['@'] = unitsResult;
+                    // Ensure @ is set to a valid number
+                    const numValue = parseFloat(unitsResult);
+                    this.variables['@'] = isNaN(numValue) ? 0 : numValue;
                     this.addResult(input, `${varName} = ${unitsResult}`, 'units');
                     return true;
                 }
@@ -436,7 +489,12 @@ class CloudyCalculator {
                 const substituted = this.substituteVariables(expression);
                 const value = this.evaluateExpression(substituted);
                 this.variables[varName] = value;
-                this.variables['@'] = value;
+                // Ensure @ is set to a valid number
+                if (typeof value === 'number' && isFinite(value)) {
+                    this.variables['@'] = value;
+                } else {
+                    this.variables['@'] = 0;
+                }
                 this.addResult(input, `${varName} = ${value}`, 'variable');
                 return true;
             } catch (error) {
@@ -510,9 +568,16 @@ class CloudyCalculator {
     substituteVariables(expression) {
         let expr = expression;
 
-        // Substitute variables
+        // Substitute the special '@' variable first (word boundaries don't match '@')
+        const atRaw = this.variables['@'];
+        const atNum = parseFloat(atRaw);
+        const atReplacement = (typeof atNum === 'number' && isFinite(atNum)) ? atNum.toString() : '0';
+        expr = expr.replace(/@/g, atReplacement);
+
+        // Substitute other variables (skip '@' which is already handled)
         for (const [name, value] of Object.entries(this.variables)) {
-            const regex = new RegExp('\\b' + name.replace(/[@$]/g, '\\$&') + '\\b', 'g');
+            if (name === '@') continue;
+            const regex = new RegExp('\\b' + name.replace(/[$]/g, '\\$&') + '\\b', 'g');
             expr = expr.replace(regex, value.toString());
         }
 
@@ -587,16 +652,12 @@ class CloudyCalculator {
                 }
                 consume(); // consume ')'
                 return result;
-            } else if (peek() === '-') {
-                consume(); // consume '-'
-                return -parseFactor();
-            } else if (peek() === '+') {
-                consume(); // consume '+'
-                return parseFactor();
+            } else if (/[0-9]/.test(peek())) {
+                return parseNumber();
             } else if (/[a-zA-Z]/.test(peek())) {
                 return parseFunction();
             } else {
-                return parseNumber();
+                throw new Error('Expected number, function, or parenthesized expression');
             }
         }
 
@@ -630,7 +691,20 @@ class CloudyCalculator {
         }
 
         function parseExpression() {
-            let result = parseTerm();
+            let result;
+            
+            // Handle unary + and - at the beginning
+            if (pos === 0 && peek() === '+') {
+                consume(); // consume '+'
+                result = parseTerm(); // Parse the term after the +
+            } else if (pos === 0 && peek() === '-') {
+                consume(); // consume '-'
+                result = -parseTerm(); // Parse and negate the term after the -
+            } else {
+                result = parseTerm(); // Normal case
+            }
+            
+            // Handle binary + and - operations
             while (pos < expr.length && /[+-]/.test(peek())) {
                 const op = consume();
                 const right = parseTerm();
@@ -684,6 +758,8 @@ class CloudyCalculator {
         while (this.calcResults.children.length > 100) {
             this.calcResults.removeChild(this.calcResults.firstChild);
         }
+        
+
     }
 
     addToHistory(input) {
@@ -817,6 +893,20 @@ class CloudyCalculator {
             const state = JSON.parse(localStorage.getItem('cloudyCalcState') || '{}');
             this.history = state.history || [];
             this.variables = state.variables || { '@': 0 };
+            
+            // Ensure @ variable is always a valid number
+            if (this.variables['@'] !== undefined) {
+                const numValue = parseFloat(this.variables['@']);
+                if (isNaN(numValue) || !isFinite(numValue)) {
+                    this.variables['@'] = 0;
+                }
+            } else {
+                this.variables['@'] = 0;
+            }
+            
+            // Clean up all variables to ensure they're valid numbers
+            this.cleanupVariables();
+            
             if (state.results) {
                 this.calcResults.innerHTML = state.results;
                 // Scroll to bottom after loading results to show most recent entries
@@ -825,6 +915,8 @@ class CloudyCalculator {
             this.historyIndex = this.history.length;
         } catch (e) {
             // Ignore errors loading state
+            // Ensure @ variable is set to 0 as fallback
+            this.variables['@'] = 0;
         }
     }
 

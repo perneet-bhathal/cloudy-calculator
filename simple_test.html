@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple Calculator Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .test-input { font-family: monospace; color: #666; }
+        .test-result { font-weight: bold; color: #333; }
+        .test-error { color: #f44336; }
+        .test-success { color: #4CAF50; }
+    </style>
+</head>
+<body>
+    <h1>Simple Calculator Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Calculator Step by Step</h2>
+        <div>
+            <button onclick="testStep1()">Test 1: Enter 10</button>
+            <button onclick="testStep2()">Test 2: Enter +20</button>
+            <button onclick="testStep3()">Test 3: Enter *30</button>
+            <button onclick="showVariables()">Show Variables</button>
+            <button onclick="clearCalculator()">Clear Calculator</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <script src="src/js/units.js"></script>
+    <script src="src/js/popup.js"></script>
+    
+    <script>
+        let calculator;
+        
+        // Initialize calculator when page loads
+        window.addEventListener('load', () => {
+            calculator = new CloudyCalculator();
+            console.log('Calculator initialized');
+            showVariables();
+        });
+        
+        function testStep1() {
+            console.log('=== Testing Step 1: Enter 10 ===');
+            console.log('Before: @ variable =', calculator.variables['@']);
+            
+            calculator.calcInput.value = '10';
+            calculator.processInput();
+            
+            console.log('After: @ variable =', calculator.variables['@']);
+            addResult('Step 1: Entered 10', 'Completed');
+        }
+        
+        function testStep2() {
+            console.log('=== Testing Step 2: Enter +20 ===');
+            console.log('Before: @ variable =', calculator.variables['@']);
+            
+            calculator.calcInput.value = '+20';
+            calculator.processInput();
+            
+            console.log('After: @ variable =', calculator.variables['@']);
+            addResult('Step 2: Entered +20', 'Completed');
+        }
+        
+        function testStep3() {
+            console.log('=== Testing Step 3: Enter *30 ===');
+            console.log('Before: @ variable =', calculator.variables['@']);
+            
+            calculator.calcInput.value = '*30';
+            calculator.processInput();
+            
+            console.log('After: @ variable =', calculator.variables['@']);
+            addResult('Step 3: Entered *30', 'Completed');
+        }
+        
+        function showVariables() {
+            console.log('Current variables:', calculator.variables);
+            addResult('Variables', JSON.stringify(calculator.variables, null, 2));
+        }
+        
+        function clearCalculator() {
+            calculator.clearAll();
+            addResult('Clear', 'Calculator cleared');
+        }
+        
+        function addResult(test, result) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'test-result';
+            resultDiv.innerHTML = `<strong>${test}:</strong> ${result}`;
+            resultsDiv.appendChild(resultDiv);
+        }
+        
+        // Auto-run test sequence
+        function runTestSequence() {
+            setTimeout(() => {
+                console.log('Starting auto-test sequence...');
+                testStep1();
+                
+                setTimeout(() => {
+                    testStep2();
+                    
+                    setTimeout(() => {
+                        testStep3();
+                        console.log('Auto-test sequence completed');
+                    }, 1000);
+                }, 1000);
+            }, 2000);
+        }
+        
+        // Run auto-test after page loads
+        setTimeout(runTestSequence, 3000);
+    </script>
+</body>
+</html> 

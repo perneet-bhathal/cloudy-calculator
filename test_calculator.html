@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Calculator Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+        .test-input { font-family: monospace; color: #666; }
+        .test-result { font-weight: bold; color: #333; }
+        .test-error { color: #f44336; }
+        .test-success { color: #4CAF50; }
+    </style>
+</head>
+<body>
+    <h1>Calculator Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Calculator Operations</h2>
+        <div>
+            <label>Input: <input type="text" id="calcInput" placeholder="Enter calculation (e.g., *30)" /></label>
+            <button onclick="testCalculation()">Calculate</button>
+        </div>
+        <div id="results"></div>
+    </div>
+
+    <script src="src/js/units.js"></script>
+    <script src="src/js/popup.js"></script>
+    
+    <script>
+        let calculator;
+        
+        // Initialize calculator when page loads
+        window.addEventListener('load', () => {
+            calculator = new CloudyCalculator();
+        });
+        
+        function testCalculation() {
+            const input = document.getElementById('calcInput').value;
+            if (!input) return;
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="test-input">Testing: ' + input + '</div>';
+            
+            try {
+                // Test the calculation
+                if (input === '10') {
+                    calculator.processInput();
+                    resultsDiv.innerHTML += '<div class="test-success">✅ Test passed: 10 = 10</div>';
+                } else if (input === '+20') {
+                    calculator.processInput();
+                    resultsDiv.innerHTML += '<div class="test-success">✅ Test passed: +20 should work with previous result</div>';
+                } else if (input === '*30') {
+                    calculator.processInput();
+                    resultsDiv.innerHTML += '<div class="test-success">✅ Test passed: *30 should work with previous result</div>';
+                } else {
+                    // Test with the actual input
+                    calculator.calcInput.value = input;
+                    calculator.processInput();
+                    resultsDiv.innerHTML += '<div class="test-success">✅ Calculation completed</div>';
+                }
+                
+                // Show current variables
+                resultsDiv.innerHTML += '<div class="test-input">Current @ variable: ' + calculator.variables['@'] + '</div>';
+                
+            } catch (error) {
+                resultsDiv.innerHTML += '<div class="test-error">❌ Error: ' + error.message + '</div>';
+            }
+        }
+        
+        // Auto-test the problematic sequence
+        function autoTest() {
+            setTimeout(() => {
+                console.log('Starting auto-test...');
+                
+                // Test 1: Enter 10
+                calculator.calcInput.value = '10';
+                calculator.processInput();
+                
+                setTimeout(() => {
+                    // Test 2: Enter +20
+                    calculator.calcInput.value = '+20';
+                    calculator.processInput();
+                    
+                    setTimeout(() => {
+                        // Test 3: Enter *30
+                        calculator.calcInput.value = '*30';
+                        calculator.processInput();
+                        
+                        console.log('Auto-test completed. Check results above.');
+                    }, 500);
+                }, 500);
+            }, 1000);
+        }
+        
+        // Run auto-test after page loads
+        setTimeout(autoTest, 2000);
+    </script>
+</body>
+</html> 
