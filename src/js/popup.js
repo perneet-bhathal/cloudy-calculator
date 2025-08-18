@@ -603,11 +603,39 @@ class CloudyCalculator {
 
         function parseNumber() {
             let num = '';
+            // Integer/decimal part
             while (pos < expr.length && /[0-9.]/.test(expr[pos])) {
                 num += consume();
             }
             if (num === '') throw new Error('Expected number');
-            return parseFloat(num);
+
+            // Scientific notation exponent part: e or E followed by optional sign and digits
+            if (pos < expr.length && (expr[pos] === 'e' || expr[pos] === 'E')) {
+                let lookaheadPos = pos + 1;
+                let expStr = 'e';
+                // Optional sign
+                if (lookaheadPos < expr.length && (expr[lookaheadPos] === '+' || expr[lookaheadPos] === '-')) {
+                    expStr += expr[lookaheadPos];
+                    lookaheadPos++;
+                }
+                // At least one digit must follow
+                let digitCount = 0;
+                while (lookaheadPos < expr.length && /[0-9]/.test(expr[lookaheadPos])) {
+                    expStr += expr[lookaheadPos];
+                    lookaheadPos++;
+                    digitCount++;
+                }
+                if (digitCount === 0) {
+                    // Not a valid exponent; leave as-is (do not consume 'e')
+                } else {
+                    // Valid exponent: consume and append
+                    while (pos < lookaheadPos) {
+                        num += consume();
+                    }
+                }
+            }
+
+            return Number(num);
         }
 
         function parseFunction() {

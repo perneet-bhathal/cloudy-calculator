@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Scientific Notation Tests</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; }
+    .pass { color: #2e7d32; }
+    .fail { color: #c62828; }
+    code { background: #f5f5f5; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Scientific Notation Tests</h1>
+  <div id="results"></div>
+
+  <script src="src/js/popup.js"></script>
+  <script>
+    function approxEqual(a, b, eps = 1e-12) {
+      return Math.abs(a - b) <= eps * Math.max(1, Math.abs(a), Math.abs(b));
+    }
+
+    function addResult(name, ok, expected, actual) {
+      const div = document.createElement('div');
+      div.className = ok ? 'pass' : 'fail';
+      div.innerHTML = (ok ? 'PASS' : 'FAIL') + ': ' + name +
+        ' — expected <code>' + expected + '</code>, got <code>' + actual + '</code>';
+      document.getElementById('results').appendChild(div);
+    }
+
+    function run() {
+      const cc = new CloudyCalculator();
+      // Access method directly
+      const evalExpr = (s) => cc.evaluateExpression(s);
+
+      const tests = [
+        { name: '5e2', expr: '5e2', expected: 500 },
+        { name: '1e0', expr: '1e0', expected: 1 },
+        { name: '1E3', expr: '1E3', expected: 1000 },
+        { name: '2.5e1', expr: '2.5e1', expected: 25 },
+        { name: '3e-2', expr: '3e-2', expected: 0.03 },
+        { name: '0.5e3 + 2', expr: '0.5e3+2', expected: 502 },
+        { name: '2e3 + 1e2', expr: '2e3+1e2', expected: 2100 },
+        { name: '(1e2)^2', expr: '(1e2)^2', expected: 10000 },
+      ];
+
+      for (const t of tests) {
+        try {
+          const actual = evalExpr(t.expr);
+          const ok = approxEqual(actual, t.expected);
+          addResult(t.name, ok, t.expected, actual);
+        } catch (e) {
+          addResult(t.name, false, t.expected, 'Error: ' + e.message);
+        }
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', run);
+    } else {
+      run();
+    }
+  </script>
+</body>
+</html>
