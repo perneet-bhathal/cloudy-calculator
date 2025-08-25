@@ -680,7 +680,13 @@ class CloudyCalculator {
                 }
                 consume(); // consume ')'
                 return result;
-            } else if (/[0-9]/.test(peek())) {
+            } else if (peek() === '-') {
+                consume(); // unary minus
+                return -parseFactor();
+            } else if (peek() === '+') {
+                consume(); // unary plus
+                return parseFactor();
+            } else if (/[0-9.]/.test(peek())) {
                 return parseNumber();
             } else if (/[a-zA-Z]/.test(peek())) {
                 return parseFunction();
@@ -719,19 +725,7 @@ class CloudyCalculator {
         }
 
         function parseExpression() {
-            let result;
-            
-            // Handle unary + and - at the beginning
-            if (pos === 0 && peek() === '+') {
-                consume(); // consume '+'
-                result = parseTerm(); // Parse the term after the +
-            } else if (pos === 0 && peek() === '-') {
-                consume(); // consume '-'
-                result = -parseTerm(); // Parse and negate the term after the -
-            } else {
-                result = parseTerm(); // Normal case
-            }
-            
+            let result = parseTerm();
             // Handle binary + and - operations
             while (pos < expr.length && /[+-]/.test(peek())) {
                 const op = consume();
