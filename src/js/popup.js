@@ -751,7 +751,8 @@ class CloudyCalculator {
             throw new Error('Result is not finite');
         }
         
-        return result;
+        // Round to reasonable precision to avoid floating point artifacts
+        return Math.round(result * 1e12) / 1e12;
     }
 
     addResult(input, result, type = 'normal') {
