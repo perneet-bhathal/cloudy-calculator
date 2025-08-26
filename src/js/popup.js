@@ -590,7 +590,7 @@ class CloudyCalculator {
 
     evaluateExpression(expression) {
         // Safe recursive descent parser
-        let expr = expression.replace(/\s/g, ''); // Remove spaces
+        let expr = expression.replace(/\s/g, '').replace(/,/g, ''); // Remove spaces and commas
         let pos = 0;
 
         function peek() {
