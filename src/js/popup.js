@@ -319,16 +319,24 @@ class CloudyCalculator {
             });
         }
 
-        // Click on results to insert them
+        // Click on results or inputs to insert them
         this.calcResults.addEventListener('click', (e) => {
-            if (e.target.classList.contains('result-value')) {
+            if (e.target.classList.contains('result-value') || e.target.classList.contains('inputText')) {
+                let value;
+                if (e.target.classList.contains('result-value')) {
+                    // Clicking on result (output)
+                    value = e.target.dataset.value || e.target.textContent.replace(/.*= /, '');
+                } else {
+                    // Clicking on input text
+                    value = e.target.textContent.replace(/ =$/, '');
+                }
+                
                 if (e.ctrlKey || e.metaKey) {
                     // Ctrl+Click to copy to clipboard
-                    this.copyToClipboard(e.target.dataset.value || e.target.textContent.replace(/.*= /, ''));
+                    this.copyToClipboard(value);
                     this.showCopyFeedback(e.target);
                 } else {
                     // Regular click to insert
-                    const value = e.target.dataset.value || e.target.textContent.replace(/.*= /, '');
                     this.insertAtCursor(value);
                 }
                 // Refocus after interaction
