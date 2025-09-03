@@ -299,6 +299,28 @@ class CloudyCalculator {
             }
         });
 
+        // Save input field value as user types (with debouncing)
+        let saveTimeout;
+        this.calcInput.addEventListener('input', () => {
+            // Clear previous timeout
+            if (saveTimeout) {
+                clearTimeout(saveTimeout);
+            }
+            // Save after 500ms of no typing
+            saveTimeout = setTimeout(() => {
+                this.saveState();
+            }, 500);
+        });
+
+        // Save input field value when user clicks or moves cursor
+        this.calcInput.addEventListener('click', () => {
+            this.saveState();
+        });
+
+        this.calcInput.addEventListener('keyup', () => {
+            this.saveState();
+        });
+
         // Clear button - now clears everything
         const clearButton = document.getElementById('clearAll');
         if (clearButton) {
@@ -914,7 +936,10 @@ class CloudyCalculator {
         const state = {
             history: this.history,
             variables: this.variables,
-            results: this.calcResults.innerHTML
+            results: this.calcResults.innerHTML,
+            inputValue: this.calcInput.value,
+            cursorStart: this.calcInput.selectionStart,
+            cursorEnd: this.calcInput.selectionEnd
         };
         localStorage.setItem('cloudyCalcState', JSON.stringify(state));
     }
@@ -943,6 +968,18 @@ class CloudyCalculator {
                 // Scroll to bottom after loading results to show most recent entries
                 setTimeout(() => this.scrollToBottom(), 0);
             }
+            
+            // Restore input field value and cursor position
+            if (state.inputValue !== undefined) {
+                this.calcInput.value = state.inputValue;
+                // Restore cursor position after a short delay to ensure the input is ready
+                setTimeout(() => {
+                    const start = state.cursorStart || 0;
+                    const end = state.cursorEnd || state.inputValue.length;
+                    this.calcInput.setSelectionRange(start, end);
+                }, 10);
+            }
+            
             this.historyIndex = this.history.length;
         } catch (e) {
             // Ignore errors loading state
