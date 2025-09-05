@@ -296,6 +296,8 @@ class CloudyCalculator {
                 e.preventDefault();
                 this.resetLastResult();
                 this.calcInput.value = '';
+                // Save state immediately after clearing input
+                this.saveState();
             }
         });
 
@@ -836,10 +838,15 @@ class CloudyCalculator {
         } else if (this.historyIndex >= this.history.length) {
             this.historyIndex = this.history.length;
             this.calcInput.value = '';
+            // Save state after clearing input
+            this.saveState();
             return;
         }
         
         this.calcInput.value = this.history[this.historyIndex] || '';
+        
+        // Save state after setting input from history
+        this.saveState();
         
         setTimeout(() => {
             this.calcInput.selectionStart = this.calcInput.selectionEnd = this.calcInput.value.length;
@@ -854,6 +861,9 @@ class CloudyCalculator {
         this.calcInput.value = value.substring(0, start) + text + value.substring(end);
         this.calcInput.selectionStart = this.calcInput.selectionEnd = start + text.length;
         this.calcInput.focus();
+        
+        // Save state immediately after inserting text
+        this.saveState();
     }
 
     async copyToClipboard(text) {
