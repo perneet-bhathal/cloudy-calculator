@@ -623,6 +623,12 @@ class CloudyCalculator {
     evaluateExpression(expression) {
         // Safe recursive descent parser
         let expr = expression.replace(/\s/g, '').replace(/,/g, ''); // Remove spaces and commas
+        
+        // Handle trailing operators by removing them
+        // This allows expressions like "8+8+" to be treated as "8+8"
+        // Also handles multiple trailing operators like "8+8++" or "5*3--"
+        expr = expr.replace(/[+\-*/^]+$/, '');
+        
         let pos = 0;
 
         function peek() {
