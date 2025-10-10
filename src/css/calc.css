@@ -9,7 +9,7 @@ ul {list-style-type:none; margin-left:-15px;}
 /*
 	Header
 */
-#headerWrapper {margin:3px;}
+#headerWrapper {margin:3px; position:fixed; top:0; left:0; right:0; background-color:white; z-index:1000; padding:3px; border-bottom:1px solid #ccc; width:calc(100% - 6px);}
 #chromeyCalcName {
 	position:absolute; margin: 20px 0px 0px 6px;
 	font-family:courier, monospace; font-size:16px; font-weight:bold; color:#3c5481;
@@ -30,7 +30,7 @@ ul {list-style-type:none; margin-left:-15px;}
 	Results
 */
 #calcResultsWrapper {
-	position:relative; margin: 1px 8px;
+	position:relative; margin: 1px 8px; margin-top:60px;
 	font-family:times, serif;
 	background-color:rgba(221,234,249,.5); border:solid #3E5785 1px;
 	-webkit-box-shadow: 0px 0px 3px black; -webkit-border-radius: 0px;
@@ -44,7 +44,7 @@ ul {list-style-type:none; margin-left:-15px;}
 .varAssignmentInputText, .varAssignmentOutputText {
 	cursor:pointer;
 }
-.outputText {position:relative;}
+.outputText {position:relative; word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap;}
 .resultLink {display: block; position: absolute; top:-3px; left:-21px; width:17px;
 	color:#3E5785; opacity:0.6;
 	font-family:Georgia,serif; font-size:16px;
@@ -67,12 +67,46 @@ ul {list-style-type:none; margin-left:-15px;}
     font-size: 15px;
     margin-bottom: 2px;
     order: 1;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    transition: background-color 0.2s ease;
+    overflow-wrap: anywhere;
+}
+
+.result-item .inputText:hover {
+    background-color: rgba(29, 30, 206, 0.1);
+}
+
+.result-item .inputText.clicked {
+    background-color: rgba(29, 30, 206, 0.3);
+    animation: highlight 0.6s ease-in-out;
 }
 
 .result-item .outputText {
     color: #123272;
     font-size: 16px;
     order: 2;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    white-space: pre-wrap;
+    transition: background-color 0.2s ease;
+    overflow-wrap: anywhere;
+}
+
+.result-item .outputText:hover {
+    background-color: rgba(29, 30, 206, 0.1);
+}
+
+.result-item .outputText.clicked {
+    background-color: rgba(29, 30, 206, 0.3);
+    animation: highlight 0.6s ease-in-out;
+}
+
+@keyframes highlight {
+    0% { background-color: rgba(29, 30, 206, 0.3); }
+    50% { background-color: rgba(29, 30, 206, 0.6); }
+    100% { background-color: rgba(29, 30, 206, 0.3); }
 }
 .errorOutputText {font-style:normal;}
 .replacedInputText, .replacedVarAssignmentInputText {text-decoration:line-through;}
@@ -112,6 +146,11 @@ ul {list-style-type:none; margin-left:-15px;}
 	border:solid #3E5785 1px; background-color:#DDEAF9;
 	font-family: inherit; font-size: 16px;
 	-webkit-box-sizing:border-box; -webkit-box-shadow: 0px 0px 3px black;
+	word-wrap: break-word; overflow-wrap: break-word; white-space: pre-wrap;
+	min-height: 20px; height: auto; resize: none;
+	overflow-wrap: anywhere;
+	hyphens: auto;
+	overflow: hidden;
 }
 #calcInputWrapper {position:relative; margin:7px 8px 6px;}
 #calcInputInnerWrapper {	position:relative;}

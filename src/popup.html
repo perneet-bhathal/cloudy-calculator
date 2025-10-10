@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cloudy Calculator</title>
     <link rel="stylesheet" type="text/css" href="css/calc.css" />
     <style>
@@ -12,7 +14,7 @@
     </style>
 </head>
 <body id="calc">
-    <div style="height:0;">
+    <div>
         <div id="calcWrapper" class="vbox">
             <table id="calcWrapperTable">
                 <!-- Header -->
@@ -21,7 +23,7 @@
                         <div id="headerWrapper" class="boxFlex0">
                             <div id="headerLinks">
                                 <a href="#popOut" id="popOut" class="headerLink">
-                                    <img src="icons/popout.png"/>
+                                    <img src="icons/popout.png" alt="Pop out calculator"/>
                                 </a>
                                 <span class="headerSeparator">|</span>
                                 <a href="http://code.google.com/p/chromey-calculator/wiki/Help" target="_tab" id="googleCalcHelp" class="headerLink">Help</a>
@@ -48,7 +50,7 @@
                 <tr>
                     <td>
                         <div id="calcInputWrapper" class="boxFlex0">
-                            <input type="text" id="calcInput" tabindex="1"/>
+                            <textarea id="calcInput" tabindex="1" placeholder="Enter calculation" rows="1"></textarea>
                             <div id="inputMarker">></div>
                         </div>
                     </td>
