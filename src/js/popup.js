@@ -123,6 +123,9 @@ class CloudyCalculator {
         await this.loadAndApplyOptions();
         this.setupEventListeners();
         
+        // Clear any stuck highlights from previous sessions
+        this.clearAllHighlights();
+        
         this.loadState();
         
         // Enhanced focus implementation
@@ -226,6 +229,14 @@ class CloudyCalculator {
         }
     }
 
+    // Auto-resize textarea based on content
+    autoResize() {
+        if (this.calcInput) {
+            this.calcInput.style.height = 'auto';
+            this.calcInput.style.height = Math.max(20, this.calcInput.scrollHeight) + 'px';
+        }
+    }
+
     async loadAndApplyOptions() {
         try {
             const options = await chrome.storage.local.get([
@@ -284,7 +295,8 @@ class CloudyCalculator {
     setupEventListeners() {
         // Main input handler
         this.calcInput.addEventListener('keydown', async (e) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
                 await this.processInput();
             } else if (e.key === 'ArrowUp') {
                 e.preventDefault();
@@ -296,9 +308,15 @@ class CloudyCalculator {
                 e.preventDefault();
                 this.resetLastResult();
                 this.calcInput.value = '';
+                this.autoResize();
                 // Save state immediately after clearing input
                 this.saveState();
             }
+        });
+
+        // Auto-resize textarea
+        this.calcInput.addEventListener('input', () => {
+            this.autoResize();
         });
 
         // Save input field value as user types (with debouncing)
@@ -351,14 +369,17 @@ class CloudyCalculator {
                     // Clicking on result (output)
                     value = e.target.dataset.value || e.target.textContent.replace(/.*= /, '');
                 } else {
-                    // Clicking on input text
-                    value = e.target.textContent.replace(/ =$/, '');
+                    // Clicking on input text - clean it before copying/inserting
+                    const rawText = e.target.textContent.replace(/ =$/, '');
+                    value = this.cleanInputText(rawText);
                 }
+                
+                // Always show visual feedback when clicking
+                this.showCopyFeedback(e.target);
                 
                 if (e.ctrlKey || e.metaKey) {
                     // Ctrl+Click to copy to clipboard
                     this.copyToClipboard(value);
-                    this.showCopyFeedback(e.target);
                 } else {
                     // Regular click to insert
                     this.insertAtCursor(value);
@@ -483,7 +504,16 @@ class CloudyCalculator {
 
         } catch (error) {
             // If we get here, both unit conversion and main parser failed
-            this.addResult(input, 'Error: ' + error.message, 'error');
+            let errorMessage = 'Error: ' + error.message;
+            
+            // Provide helpful suggestions for common errors
+            if (error.message.includes('multiple decimal points')) {
+                errorMessage += ' (Tip: Check for numbers with multiple decimal points like "761.66668350.52448" - should be "761.6666835052448")';
+            } else if (error.message.includes('Result is not finite')) {
+                errorMessage += ' (Tip: Check for invalid numbers or division by zero)';
+            }
+            
+            this.addResult(input, errorMessage, 'error');
             
             // Don't update @ variable on error - keep the last valid result
             // But ensure @ is still a valid number
@@ -531,7 +561,16 @@ class CloudyCalculator {
                 return true;
             } catch (error) {
                 // If we get here, both unit conversion and main parser failed
-                this.addResult(input, 'Error: ' + error.message, 'error');
+                let errorMessage = 'Error: ' + error.message;
+                
+                // Provide helpful suggestions for common errors
+                if (error.message.includes('multiple decimal points')) {
+                    errorMessage += ' (Tip: Check for numbers with multiple decimal points like "761.66668350.52448" - should be "761.6666835052448")';
+                } else if (error.message.includes('Result is not finite')) {
+                    errorMessage += ' (Tip: Check for invalid numbers or division by zero)';
+                }
+                
+                this.addResult(input, errorMessage, 'error');
                 return true;
             }
         }
@@ -641,11 +680,27 @@ class CloudyCalculator {
 
         function parseNumber() {
             let num = '';
-            // Integer/decimal part
+            let decimalCount = 0;
+            
+            // Integer/decimal part - count decimal points
             while (pos < expr.length && /[0-9.]/.test(expr[pos])) {
+                const char = expr[pos];
+                if (char === '.') {
+                    decimalCount++;
+                    if (decimalCount > 1) {
+                        // Multiple decimal points detected - this is malformed
+                        throw new Error('Invalid number: multiple decimal points');
+                    }
+                }
                 num += consume();
             }
+            
             if (num === '') throw new Error('Expected number');
+            
+            // Validate the number format
+            if (decimalCount > 1) {
+                throw new Error('Invalid number: multiple decimal points');
+            }
 
             // Scientific notation exponent part: e or E followed by optional sign and digits
             if (pos < expr.length && (expr[pos] === 'e' || expr[pos] === 'E')) {
@@ -673,7 +728,12 @@ class CloudyCalculator {
                 }
             }
 
-            return Number(num);
+            const result = Number(num);
+            if (isNaN(result)) {
+                throw new Error('Invalid number format');
+            }
+            
+            return result;
         }
 
         function parseFunction() {
@@ -812,8 +872,8 @@ class CloudyCalculator {
         
         this.calcResults.appendChild(li);
         
-        // Scroll to bottom
-        this.calcResultsWrapper.scrollTop = this.calcResultsWrapper.scrollHeight;
+        // Scroll to bottom to show the new result
+        setTimeout(() => this.scrollToBottom(), 10);
         
         // Limit results to 100
         while (this.calcResults.children.length > 100) {
@@ -850,6 +910,7 @@ class CloudyCalculator {
         }
         
         this.calcInput.value = this.history[this.historyIndex] || '';
+        this.autoResize();
         
         // Save state after setting input from history
         this.saveState();
@@ -867,6 +928,7 @@ class CloudyCalculator {
         this.calcInput.value = value.substring(0, start) + text + value.substring(end);
         this.calcInput.selectionStart = this.calcInput.selectionEnd = start + text.length;
         this.calcInput.focus();
+        this.autoResize();
         
         // Save state immediately after inserting text
         this.saveState();
@@ -887,14 +949,46 @@ class CloudyCalculator {
     }
 
     showCopyFeedback(element) {
-        const originalOpacity = element.style.opacity;
-        element.style.opacity = '0.3';
-        setTimeout(() => {
-            element.style.opacity = originalOpacity;
-        }, 200);
+        // Clear any existing timeout for this element
+        if (element._feedbackTimeout) {
+            clearTimeout(element._feedbackTimeout);
+        }
+        
+        // Add clicked class for visual feedback
+        element.classList.add('clicked');
+        
+        // Remove the clicked class after animation completes
+        element._feedbackTimeout = setTimeout(() => {
+            element.classList.remove('clicked');
+            element._feedbackTimeout = null;
+        }, 600);
+    }
+
+    clearAllHighlights() {
+        // Clear all stuck highlights and their timeouts
+        const highlightedElements = document.querySelectorAll('.clicked');
+        highlightedElements.forEach(element => {
+            if (element._feedbackTimeout) {
+                clearTimeout(element._feedbackTimeout);
+                element._feedbackTimeout = null;
+            }
+            element.classList.remove('clicked');
+        });
+    }
+
+    // Clean input text by fixing common formatting issues
+    cleanInputText(text) {
+        // Fix multiple decimal points in numbers
+        // This regex finds numbers with multiple decimal points and fixes them
+        return text.replace(/(\d+\.\d+)\.(\d+)/g, (match, before, after) => {
+            // If there are multiple decimal points, combine them
+            return before + after;
+        });
     }
 
     clearResults() {
+        // Clear any stuck highlights before clearing results
+        this.clearAllHighlights();
         this.calcResults.innerHTML = '';
         // Scroll to top when clearing results
         if (this.calcResultsWrapper) {
@@ -904,6 +998,8 @@ class CloudyCalculator {
 
     // New method: Clear everything including variables and history
     clearAll() {
+        // Clear any stuck highlights before clearing everything
+        this.clearAllHighlights();
         this.calcResults.innerHTML = '';
         this.history = [];
         this.historyIndex = -1;
