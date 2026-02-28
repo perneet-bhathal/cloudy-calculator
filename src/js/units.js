@@ -1,6 +1,73 @@
 // Comprehensive unit conversion library for Cloudy Calculator
 // Supports mixed units, currency, number bases, constants, and more
 
+// Helper to extract decimal places from a number string  
+function getDecimalPlaces(numStr) {
+    var str = String(numStr).trim();
+    if (!str.includes('.')) return 0;
+    return str.split('.')[1].length;
+}
+
+// Round a number to a specific precision, eliminating floating-point noise
+function roundToPrecision(num, precision) {
+    if (precision === 0) return Math.round(num);
+    var multiplier = Math.pow(10, precision);
+    return Math.round(num * multiplier) / multiplier;
+}
+
+// Precision-safe arithmetic functions using decimal string manipulation
+// This completely avoids floating-point precision errors
+function preciseAdd(a, b, aPrecision, bPrecision) {
+    // Convert to strings
+    var aStr = String(a);
+    var bStr = String(b);
+    
+    // Parse integer and decimal parts
+    var aParts = aStr.split('.');
+    var bParts = bStr.split('.');
+    
+    var aInt = parseInt(aParts[0]) || 0;
+    var bInt = parseInt(bParts[0]) || 0;
+    
+    var aDec = aParts[1] || '';
+    var bDec = bParts[1] || '';
+    
+    // Use provided precision if available, otherwise use actual decimal length
+    var aActualLen = aPrecision !== undefined ? aPrecision : aDec.length;
+    var bActualLen = bPrecision !== undefined ? bPrecision : bDec.length;
+    
+    // Pad to same length for calculation
+    var maxLen = Math.max(aActualLen, bActualLen);
+    aDec = aDec.padEnd(maxLen, '0');
+    bDec = bDec.padEnd(maxLen, '0');
+    
+    // Convert decimal parts to integers
+    var aDecInt = parseInt(aDec) || 0;
+    var bDecInt = parseInt(bDec) || 0;
+    
+    // Add decimals (as integers!)
+    var decSum = aDecInt + bDecInt;
+    var carry = Math.floor(decSum / Math.pow(10, maxLen));
+    decSum = decSum % Math.pow(10, maxLen);
+    
+    // Add integers with carry
+    var intSum = aInt + bInt + carry;
+    
+    // Build result
+    if (maxLen === 0) {
+        return { value: intSum, precision: 0 };
+    }
+    
+    var decStr = String(decSum).padStart(maxLen, '0');
+    var resultStr = intSum + '.' + decStr;
+    
+    return { value: parseFloat(resultStr), precision: maxLen };
+}
+
+function preciseSubtract(a, b, aPrecision, bPrecision) {
+    return preciseAdd(a, -b, aPrecision, bPrecision);
+}
+
 // Mathematical and Physical Constants
 var CONSTANTS = {
     pi: Math.PI,
@@ -379,6 +446,70 @@ function parseNumberWithBase(str) {
     return { value: parseFloat(str), base: 10 };
 }
 
+// Helper function to format numbers and remove floating-point artifacts
+function formatNumber(num) {
+    if (typeof num !== 'number' || !isFinite(num)) {
+        return num;
+    }
+    
+    // Limit to maximum 6 decimal places to avoid excessive precision
+    // Collect all valid precisions, then choose the best one
+    var candidates = [];
+    
+    for (var decimals = 0; decimals <= 6; decimals++) {
+        var multiplier = Math.pow(10, decimals);
+        var rounded = Math.round(num * multiplier) / multiplier;
+        var diff = Math.abs(num - rounded);
+        
+        // If the difference is very small (floating-point error), this precision works
+        if (diff < 1e-9) {
+            var testFormatted = rounded.toFixed(decimals);
+            // Check for artifact patterns:
+            // 1. Excessive trailing zeros (2+ zeros at the end)
+            // 2. Long strings of zeros followed by 1-2 digits (floating-point artifacts)
+            var decimalPart = testFormatted.split('.')[1] || '';
+            var trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
+            var hasArtifact = trailingZeros >= 2 || 
+                             testFormatted.match(/0{5,}[12]$/);
+            
+            if (!hasArtifact) {
+                candidates.push({
+                    precision: decimals,
+                    rounded: rounded,
+                    trailingZeros: trailingZeros
+                });
+            }
+        }
+    }
+    
+    // Choose the best candidate: prefer 0 trailing zeros at lowest precision, then 1 trailing zero
+    var best = candidates[0];
+    for (var i = 1; i < candidates.length; i++) {
+        var c = candidates[i];
+        if (c.trailingZeros === 0 && best.trailingZeros !== 0) {
+            // Always prefer 0 trailing zeros
+            best = c;
+        } else if (c.trailingZeros === 0 && best.trailingZeros === 0 && c.precision < best.precision) {
+            // If both have 0 trailing zeros, prefer lower precision
+            best = c;
+        } else if (c.trailingZeros === 1 && best.trailingZeros > 1) {
+            // Use 1 trailing zero only if no 0-trailing-zero option exists
+            best = c;
+        } else if (best.trailingZeros > 1 && c.precision > best.precision) {
+            // If no good option, prefer higher precision
+            best = c;
+        }
+    }
+    
+    var bestPrecision = best ? best.precision : 0;
+    var bestRounded = best ? best.rounded : num;
+    
+    // Format with the best precision found
+    var formatted = bestRounded.toFixed(bestPrecision);
+    // Remove trailing zeros only if entire decimal part is zeros
+    return formatted.replace(/\.0+$/, '');
+}
+
 // Mathematical functions
 var MATH_FUNCTIONS = {
     sin: Math.sin,
@@ -474,7 +605,7 @@ function unitsJsCalc(input) {
                 }
             }
             if (result !== undefined && !isNaN(result)) {
-                return result.toString();
+                return formatNumber(result);
             }
         }
     }
@@ -547,7 +678,7 @@ function unitsJsCalc(input) {
         try {
             var mathVal = Function('return (' + expr + ')')();
             if (typeof mathVal === 'number' && isFinite(mathVal)) {
-                return mathVal.toString();
+                return formatNumber(mathVal);
             }
         } catch (err) {}
     }
@@ -729,7 +860,7 @@ function unitsJsCalc(input) {
             }
             
             if (!isNaN(result)) {
-                return result.toString();
+                return formatNumber(result);
             }
         }
     }
@@ -796,7 +927,7 @@ function unitsJsCalc(input) {
             }
             
             if (!isNaN(result)) {
-                return result.toString();
+                return formatNumber(result);
             }
         }
     }
@@ -995,7 +1126,7 @@ function unitsJsCalc(input) {
         });
         var evalResult = Function('return (' + expr + ')')();
         if (!isNaN(evalResult)) {
-            return evalResult.toString();
+            return formatNumber(evalResult);
         }
     }
     
@@ -1216,6 +1347,8 @@ function processMixedUnits(input) {
     var result = 0;
     var resultUnit = null;
     var firstUnitCategory = null;
+    var resultPrecision = 0;  // Track decimal precision for calculation
+    var displayPrecision = 0;  // Track first value's precision for display
     
     // Process the first value (always positive)
     var firstValue = parts[0].trim();
@@ -1224,6 +1357,10 @@ function processMixedUnits(input) {
     
     var numValue = unitMatch[1];
     var unit = unitMatch[2];
+    
+    // Track original precision from string
+    var firstPrecision = getDecimalPlaces(numValue);
+    displayPrecision = firstPrecision;  // Use first value's precision for display
     
     // Handle fractions in the first value
     var number;
@@ -1279,6 +1416,7 @@ function processMixedUnits(input) {
     // Set the first value
     resultUnit = baseUnit;
     result = baseValue;
+    resultPrecision = firstPrecision;
     
     // Process remaining values with their operators
     for (var i = 1; i < parts.length; i += 2) {
@@ -1293,6 +1431,9 @@ function processMixedUnits(input) {
         
         var valueNumValue = valueUnitMatch[1];
         var valueUnit = valueUnitMatch[2];
+        
+        // Track original precision from string
+        var valuePrecision = getDecimalPlaces(valueNumValue);
         
         // Handle fractions in the value
         var valueNumber;
@@ -1343,16 +1484,25 @@ function processMixedUnits(input) {
             }
         }
         
-        // Apply the operator
+        // Apply the operator using precision-safe arithmetic
+        var opResult;
         if (operator === '+') {
-            result += valueBaseValue;
+            opResult = preciseAdd(result, valueBaseValue, resultPrecision, valuePrecision);
         } else if (operator === '-') {
-            result -= valueBaseValue;
+            opResult = preciseSubtract(result, valueBaseValue, resultPrecision, valuePrecision);
         }
+        result = opResult.value;
+        resultPrecision = opResult.precision;
     }
     
     if (resultUnit) {
-        return result.toFixed(6)+" "+resultUnit;
+        // Round the result to eliminate floating-point noise
+        var cleanedResult = roundToPrecision(result, Math.min(displayPrecision, 10));
+        
+        // Format the result using the first value's precision
+        // This ensures 56.235 + 0.005000 = 56.240 (shows 3 decimals, matching first value)
+        var formattedResult = cleanedResult.toFixed(Math.min(displayPrecision, 6));
+        return formattedResult + " " + resultUnit;
     }
     
     return null;

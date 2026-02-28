@@ -849,8 +849,155 @@ class CloudyCalculator {
             throw new Error('Result is not finite');
         }
         
-        // Round to reasonable precision to avoid floating point artifacts
-        return Math.round(result * 1e12) / 1e12;
+        return result;
+    }
+    
+    // Extract maximum decimal precision from input string
+    getInputPrecision(input) {
+        if (!input || typeof input !== 'string') return null;
+        
+        // Find all numbers in the input (including decimals)
+        const numberMatches = input.match(/\d+\.\d+/g);
+        if (!numberMatches || numberMatches.length === 0) return null;
+        
+        let maxPrecision = 0;
+        for (const match of numberMatches) {
+            const decimalPart = match.split('.')[1];
+            if (decimalPart) {
+                maxPrecision = Math.max(maxPrecision, decimalPart.length);
+            }
+        }
+        
+        return maxPrecision > 0 ? maxPrecision : null;
+    }
+
+    formatNumber(num, inputPrecision = null) {
+        if (typeof num !== 'number' || !isFinite(num)) {
+            return num;
+        }
+        
+        // If input precision is provided, use it (but still check for artifacts)
+        if (inputPrecision !== null && inputPrecision >= 0 && inputPrecision <= 6) {
+            // For division/multiplication, results may need more precision than inputs
+            // For addition/subtraction, results may need less precision
+            // Check from 6 down to 0, but prioritize input precision
+            const maxPrecision = 6;
+            
+            // Collect valid precisions from maxPrecision down to 0
+            const candidates = [];
+            for (let p = maxPrecision; p >= 0; p--) {
+                const multiplier = Math.pow(10, p);
+                const rounded = Math.round(num * multiplier) / multiplier;
+                const diff = Math.abs(num - rounded);
+                
+                // Use a more lenient tolerance for input-precision-based formatting
+                // This handles division results that aren't exactly representable
+                const tolerance = p <= inputPrecision ? 1e-6 : 1e-9;
+                if (diff < tolerance) {
+                    const formatted = rounded.toFixed(p);
+                    // Check for artifact patterns: excessive trailing zeros (2+ zeros) or long zero sequences
+                    const decimalPart = formatted.split('.')[1] || '';
+                    const trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
+                    // For input precision, be more strict: 2+ trailing zeros is excessive
+                    const hasArtifact = trailingZeros >= 2 || formatted.match(/0{5,}[12]$/);
+                    
+                    if (!hasArtifact) {
+                        candidates.push({
+                            precision: p,
+                            formatted: formatted,
+                            trailingZeros: trailingZeros
+                        });
+                    }
+                }
+            }
+            
+            // Prefer meaningful precision: 1 trailing zero at/below input precision, then 0 trailing zeros
+            if (candidates.length > 0) {
+                // First, try to find 1 trailing zero at or below input precision (within 2 places, but not above)
+                let best = candidates.find(c => c.trailingZeros === 1 && 
+                    c.precision <= inputPrecision && (inputPrecision - c.precision) <= 2);
+                if (!best) {
+                    // Then try 0 trailing zeros at exactly input precision
+                    best = candidates.find(c => c.precision === inputPrecision && c.trailingZeros === 0);
+                }
+                if (!best) {
+                    // Then try 0 trailing zeros at any precision
+                    best = candidates.find(c => c.trailingZeros === 0);
+                }
+                if (!best) {
+                    // Then try 1 trailing zero at any precision
+                    best = candidates.find(c => c.trailingZeros === 1);
+                }
+                if (!best) {
+                    // Fallback to first (highest precision)
+                    best = candidates[0];
+                }
+                return best.formatted;
+            }
+            
+            // If no candidates found with tolerance, use input precision directly
+            // This ensures we at least show the input precision
+            const multiplier = Math.pow(10, inputPrecision);
+            const rounded = Math.round(num * multiplier) / multiplier;
+            return rounded.toFixed(inputPrecision);
+        }
+        
+        // Limit to maximum 6 decimal places to avoid excessive precision
+        // Collect all valid precisions, then choose the best one
+        const candidates = [];
+        
+        for (let decimals = 0; decimals <= 6; decimals++) {
+            const multiplier = Math.pow(10, decimals);
+            const rounded = Math.round(num * multiplier) / multiplier;
+            const diff = Math.abs(num - rounded);
+            
+            // If the difference is very small (floating-point error), this precision works
+            if (diff < 1e-9) {
+                const testFormatted = rounded.toFixed(decimals);
+                // Check for artifact patterns:
+                // 1. Excessive trailing zeros (2+ zeros at the end)
+                // 2. Long strings of zeros followed by 1-2 digits (floating-point artifacts)
+                const decimalPart = testFormatted.split('.')[1] || '';
+                const trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
+                const hasArtifact = trailingZeros >= 2 || 
+                                   testFormatted.match(/0{5,}[12]$/);
+                
+                if (!hasArtifact) {
+                    candidates.push({
+                        precision: decimals,
+                        rounded: rounded,
+                        trailingZeros: trailingZeros
+                    });
+                }
+            }
+        }
+        
+        // Choose the best candidate: prefer 0 trailing zeros at lowest precision, then 1 trailing zero
+        let best = candidates[0];
+        for (let i = 1; i < candidates.length; i++) {
+            const c = candidates[i];
+            if (c.trailingZeros === 0 && best.trailingZeros !== 0) {
+                // Always prefer 0 trailing zeros
+                best = c;
+            } else if (c.trailingZeros === 0 && best.trailingZeros === 0 && c.precision < best.precision) {
+                // If both have 0 trailing zeros, prefer lower precision
+                best = c;
+            } else if (c.trailingZeros === 1 && best.trailingZeros > 1) {
+                // Use 1 trailing zero only if no 0-trailing-zero option exists
+                best = c;
+            } else if (best.trailingZeros > 1 && c.precision > best.precision) {
+                // If no good option, prefer higher precision
+                best = c;
+            }
+        }
+        
+        const bestPrecision = best ? best.precision : 0;
+        const bestRounded = best ? best.rounded : num;
+        
+        // Format with the best precision found
+        const formatted = bestRounded.toFixed(bestPrecision);
+        // Remove trailing zeros only if entire decimal part is zeros
+        return formatted.replace(/\.0+$/, '');
     }
 
     addResult(input, result, type = 'normal') {
@@ -861,11 +1008,25 @@ class CloudyCalculator {
         inputSpan.className = 'inputText';
         inputSpan.textContent = `${input} =`;
         
+        // Format the result to remove floating-point artifacts
+        // Extract precision from input to preserve meaningful trailing zeros
+        const inputPrecision = this.getInputPrecision(input);
+        let displayResult = result;
+        if (typeof result === 'number' && isFinite(result)) {
+            displayResult = this.formatNumber(result, inputPrecision);
+        } else if (typeof result === 'string') {
+            // Try to parse and format string results too
+            const parsed = parseFloat(result);
+            if (!isNaN(parsed) && isFinite(parsed)) {
+                displayResult = this.formatNumber(parsed, inputPrecision);
+            }
+        }
+        
         const resultSpan = document.createElement('span');
         resultSpan.className = `outputText result-value ${type}`;
-        resultSpan.textContent = result;
+        resultSpan.textContent = displayResult;
         resultSpan.style.cursor = 'pointer';
-        resultSpan.dataset.value = typeof result === 'number' ? result.toString() : result;
+        resultSpan.dataset.value = displayResult;
         
         li.appendChild(inputSpan);
         li.appendChild(resultSpan);
