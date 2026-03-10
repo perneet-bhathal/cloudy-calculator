@@ -501,8 +501,36 @@ function formatNumber(num) {
         }
     }
     
-    var bestPrecision = best ? best.precision : 0;
-    var bestRounded = best ? best.rounded : num;
+    // If no exact-match candidates found, find appropriate precision for the number
+    if (!best) {
+        // Check if the number has a fractional part
+        var hasFraction = Math.abs(num - Math.floor(num)) > 1e-9;
+        
+        if (hasFraction) {
+            // For numbers with fractional parts, find the precision that shows meaningful digits
+            // Try precisions from 2 to 6, looking for one that doesn't have excessive trailing zeros
+            for (var decimals = 2; decimals <= 6; decimals++) {
+                var multiplier = Math.pow(10, decimals);
+                var rounded = Math.round(num * multiplier) / multiplier;
+                var testFormatted = rounded.toFixed(decimals);
+                var decimalPart = testFormatted.split('.')[1] || '';
+                var trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
+                
+                // Prefer precision with 0-1 trailing zeros
+                if (trailingZeros <= 1) {
+                    return testFormatted.replace(/\.0+$/, '');
+                }
+            }
+            // If all have excessive trailing zeros, use 2 decimal places as default
+            return num.toFixed(2).replace(/\.0+$/, '');
+        } else {
+            // Integer result - no decimal places needed
+            return Math.round(num).toString();
+        }
+    }
+    
+    var bestPrecision = best.precision;
+    var bestRounded = best.rounded;
     
     // Format with the best precision found
     var formatted = bestRounded.toFixed(bestPrecision);

@@ -991,8 +991,36 @@ class CloudyCalculator {
             }
         }
         
-        const bestPrecision = best ? best.precision : 0;
-        const bestRounded = best ? best.rounded : num;
+        // If no exact-match candidates found, find appropriate precision for the number
+        if (!best) {
+            // Check if the number has a fractional part
+            const hasFraction = Math.abs(num - Math.floor(num)) > 1e-9;
+            
+            if (hasFraction) {
+                // For numbers with fractional parts, find the precision that shows meaningful digits
+                // Try precisions from 2 to 6, looking for one that doesn't have excessive trailing zeros
+                for (let decimals = 2; decimals <= 6; decimals++) {
+                    const multiplier = Math.pow(10, decimals);
+                    const rounded = Math.round(num * multiplier) / multiplier;
+                    const testFormatted = rounded.toFixed(decimals);
+                    const decimalPart = testFormatted.split('.')[1] || '';
+                    const trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
+                    
+                    // Prefer precision with 0-1 trailing zeros
+                    if (trailingZeros <= 1) {
+                        return testFormatted.replace(/\.0+$/, '');
+                    }
+                }
+                // If all have excessive trailing zeros, use 2 decimal places as default
+                return num.toFixed(2).replace(/\.0+$/, '');
+            } else {
+                // Integer result - no decimal places needed
+                return Math.round(num).toString();
+            }
+        }
+        
+        const bestPrecision = best.precision;
+        const bestRounded = best.rounded;
         
         // Format with the best precision found
         const formatted = bestRounded.toFixed(bestPrecision);
@@ -1192,6 +1220,9 @@ class CloudyCalculator {
     }
 
     openPopout() {
+        // Save state before opening pop-out window
+        this.saveState();
+        
         // Create the pop-out window using stored width/height (fallback 500×500)
         chrome.storage.local.get(['width', 'height'], (opts) => {
             const w = opts.width ? (parseInt(opts.width) || 500) : 500;
@@ -1201,6 +1232,12 @@ class CloudyCalculator {
                 type: 'popup',
                 width: w,
                 height: h
+            }, () => {
+                // Close the extension popup after the new window is created
+                // Use a small delay to ensure the new window is fully initialized
+                setTimeout(() => {
+                    window.close();
+                }, 100);
             });
         });
     }
