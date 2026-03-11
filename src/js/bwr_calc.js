@@ -112,9 +112,22 @@ var cCalc = (function (window, document) {
 	var $calcInput,	$calcResults, $calcResultsWrapper;
 	function calcInit(currentWindow) {		
 		background.helperIsInstalled = false;
-		chrome.extension.sendRequest(chromeyCalcHelperId, {"ding": "dong"}, function (response) {
-			background.helperIsInstalled = true;			
-		});
+		// Use chrome.runtime.sendMessage for Manifest V3 compatibility
+		if (typeof chrome.runtime !== 'undefined' && chrome.runtime.sendMessage) {
+			chrome.runtime.sendMessage(chromeyCalcHelperId, {"ding": "dong"}, function (response) {
+				if (chrome.runtime.lastError) {
+					// Helper extension not available
+					background.helperIsInstalled = false;
+				} else {
+					background.helperIsInstalled = true;
+				}
+			});
+		} else if (typeof chrome.extension !== 'undefined' && chrome.extension.sendRequest) {
+			// Fallback for older Chrome versions
+			chrome.extension.sendRequest(chromeyCalcHelperId, {"ding": "dong"}, function (response) {
+				background.helperIsInstalled = true;			
+			});
+		}
 		// Set window to whatever window was passed to calcInit
 		window = currentWindow;
 		document = window.document;
@@ -172,9 +185,21 @@ var cCalc = (function (window, document) {
 			}).bind("blur.helperFlag", function () {				
 				// update flag for chekcing if helper extention is isntalled
 				background.helperIsInstalled = false;
-				chrome.extension.sendRequest(chromeyCalcHelperId, {"ding": "dong"}, function (response) {
-					background.helperIsInstalled = true;			
-				});
+				// Use chrome.runtime.sendMessage for Manifest V3 compatibility
+				if (typeof chrome.runtime !== 'undefined' && chrome.runtime.sendMessage) {
+					chrome.runtime.sendMessage(chromeyCalcHelperId, {"ding": "dong"}, function (response) {
+						if (chrome.runtime.lastError) {
+							background.helperIsInstalled = false;
+						} else {
+							background.helperIsInstalled = true;
+						}
+					});
+				} else if (typeof chrome.extension !== 'undefined' && chrome.extension.sendRequest) {
+					// Fallback for older Chrome versions
+					chrome.extension.sendRequest(chromeyCalcHelperId, {"ding": "dong"}, function (response) {
+						background.helperIsInstalled = true;			
+					});
+				}
 			});		
 
 			// Handle enter and arrow keydown events
@@ -575,13 +600,55 @@ var cCalc = (function (window, document) {
 					// Query for result								
 					if (doHelperQuery(queryType)) {
 						// Let Chromey Calculator Enhancer handle query
-						chrome.extension.sendRequest(chromeyCalcHelperId, {queryUri: uri}, function (response) {							
-							queryCallback(response.doc);		
-						});
+						// Use chrome.runtime.sendMessage for Manifest V3 compatibility
+						if (typeof chrome.runtime !== 'undefined' && chrome.runtime.sendMessage) {
+							chrome.runtime.sendMessage(chromeyCalcHelperId, {queryUri: uri}, function (response) {
+								if (chrome.runtime.lastError) {
+									// Helper extension not available, fall back to direct AJAX
+									$.ajax({
+										url: uri,
+										success: queryCallback,
+										error: function() {
+											// CORS or other error - Google search may not work via AJAX
+											queryCallback(null);
+										}
+									});
+								} else if (response && response.doc) {
+									queryCallback(response.doc);
+								} else {
+									queryCallback(null);
+								}
+							});
+						} else if (typeof chrome.extension !== 'undefined' && chrome.extension.sendRequest) {
+							// Fallback for older Chrome versions
+							chrome.extension.sendRequest(chromeyCalcHelperId, {queryUri: uri}, function (response) {
+								if (response && response.doc) {
+									queryCallback(response.doc);
+								} else {
+									queryCallback(null);
+								}
+							});
+						} else {
+							// No messaging API available, try direct AJAX
+							$.ajax({
+								url: uri,
+								success: queryCallback,
+								error: function() {
+									queryCallback(null);
+								}
+							});
+						}
 					} else {
+						// Direct AJAX query (may fail due to CORS on Google search pages)
 						$.ajax({
 							url: uri,
-							success: queryCallback
+							success: queryCallback,
+							error: function(xhr, status, error) {
+								// CORS error or other failure - Google search pages don't allow cross-origin requests
+								// This is expected behavior - the helper extension is needed for Google queries
+								console.log('Google query failed (CORS):', error);
+								queryCallback(null);
+							}
 						});
 					}
 				}
