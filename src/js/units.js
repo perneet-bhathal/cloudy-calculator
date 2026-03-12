@@ -262,18 +262,40 @@ var UNITS = {
     // Area
     area: {
         'sq-m': 1,
+        'sqm': 1,
+        'sq m': 1,
+        'square-meter': 1,
+        'square-metre': 1,
+        'square meters': 1,
+        'square metres': 1,
         'm²': 1,
         'sq-km': 1e6,
+        'sqkm': 1e6,
+        'sq km': 1e6,
         'km²': 1e6,
         'sq-cm': 1e-4,
+        'sqcm': 1e-4,
+        'sq cm': 1e-4,
         'cm²': 1e-4,
         'sq-mi': 2589988.110336,
+        'sqmi': 2589988.110336,
+        'sq mi': 2589988.110336,
         'mi²': 2589988.110336,
         'sq-yd': 0.83612736,
+        'sqyd': 0.83612736,
+        'sq yd': 0.83612736,
         'yd²': 0.83612736,
         'sq-ft': 0.09290304,
+        'sqft': 0.09290304,
+        'sq ft': 0.09290304,
+        'square-foot': 0.09290304,
+        'square foot': 0.09290304,
+        'square-feet': 0.09290304,
+        'square feet': 0.09290304,
         'ft²': 0.09290304,
         'sq-in': 0.00064516,
+        'sqin': 0.00064516,
+        'sq in': 0.00064516,
         'in²': 0.00064516,
         acre: 4046.8564224,
         acres: 4046.8564224,
@@ -348,6 +370,312 @@ var UNITS = {
         decade: 315360000,
         century: 3153600000,
         millennium: 31536000000
+    },
+    
+    // Energy
+    energy: {
+        J: 1,
+        joule: 1,
+        joules: 1,
+        cal: 4.184,
+        calorie: 4.184,
+        calories: 4.184,
+        kcal: 4184,
+        kilocalorie: 4184,
+        kilocalories: 4184,
+        'Cal': 4184, // food calorie (capital C)
+        BTU: 1055.06,
+        'btu': 1055.06,
+        'kWh': 3600000,
+        'kwh': 3600000,
+        'kilowatt-hour': 3600000,
+        'kilowatt-hours': 3600000,
+        'MWh': 3600000000,
+        'mwh': 3600000000,
+        'megawatt-hour': 3600000000,
+        'megawatt-hours': 3600000000,
+        'eV': 1.602176634e-19,
+        'ev': 1.602176634e-19,
+        'electron-volt': 1.602176634e-19,
+        'electron-volts': 1.602176634e-19,
+        'keV': 1.602176634e-16,
+        'MeV': 1.602176634e-13,
+        'GeV': 1.602176634e-10,
+        'therm': 105506000,
+        'thm': 105506000,
+        'foot-pound': 1.35582,
+        'ft-lb': 1.35582,
+        'ft-lbf': 1.35582
+    },
+    
+    // Power
+    power: {
+        W: 1,
+        watt: 1,
+        watts: 1,
+        kW: 1000,
+        'kw': 1000,
+        kilowatt: 1000,
+        kilowatts: 1000,
+        MW: 1000000,
+        'mw': 1000000,
+        megawatt: 1000000,
+        megawatts: 1000000,
+        GW: 1000000000,
+        'gw': 1000000000,
+        gigawatt: 1000000000,
+        gigawatts: 1000000000,
+        hp: 745.7,
+        horsepower: 745.7,
+        'metric-hp': 735.499,
+        'metric-horsepower': 735.499,
+        'ps': 735.499,
+        mW: 0.001,
+        'mw': 0.001,
+        milliwatt: 0.001,
+        milliwatts: 0.001
+    },
+    
+    // Pressure
+    pressure: {
+        Pa: 1,
+        pascal: 1,
+        pascals: 1,
+        kPa: 1000,
+        'kpa': 1000,
+        kilopascal: 1000,
+        kilopascals: 1000,
+        MPa: 1000000,
+        'mpa': 1000000,
+        megapascal: 1000000,
+        megapascals: 1000000,
+        bar: 100000,
+        bars: 100000,
+        mbar: 100,
+        'millibar': 100,
+        'millibars': 100,
+        psi: 6894.76,
+        'lb/in²': 6894.76,
+        'pound-per-square-inch': 6894.76,
+        'pounds-per-square-inch': 6894.76,
+        atm: 101325,
+        atmosphere: 101325,
+        atmospheres: 101325,
+        torr: 133.322,
+        'mmHg': 133.322,
+        'mm-hg': 133.322,
+        'millimeter-of-mercury': 133.322,
+        'inHg': 3386.39,
+        'in-hg': 3386.39,
+        'inch-of-mercury': 3386.39,
+        'psf': 47.8803,
+        'lb/ft²': 47.8803,
+        'pound-per-square-foot': 47.8803
+    },
+    
+    // Data Storage (binary - 1024 based)
+    'data-storage': {
+        B: 1,
+        byte: 1,
+        bytes: 1,
+        KB: 1024,
+        'kb': 1024,
+        kilobyte: 1024,
+        kilobytes: 1024,
+        MB: 1048576,
+        'mb': 1048576,
+        megabyte: 1048576,
+        megabytes: 1048576,
+        GB: 1073741824,
+        'gb': 1073741824,
+        gigabyte: 1073741824,
+        gigabytes: 1073741824,
+        TB: 1099511627776,
+        'tb': 1099511627776,
+        terabyte: 1099511627776,
+        terabytes: 1099511627776,
+        PB: 1125899906842624,
+        'pb': 1125899906842624,
+        petabyte: 1125899906842624,
+        petabytes: 1125899906842624,
+        EB: 1152921504606846976,
+        'eb': 1152921504606846976,
+        exabyte: 1152921504606846976,
+        exabytes: 1152921504606846976,
+        // Decimal versions (1000 based) - using KiB, MiB notation
+        'KiB': 1024,
+        'kib': 1024,
+        'kibibyte': 1024,
+        'kibibytes': 1024,
+        'MiB': 1048576,
+        'mib': 1048576,
+        'mebibyte': 1048576,
+        'mebibytes': 1048576,
+        'GiB': 1073741824,
+        'gib': 1073741824,
+        'gibibyte': 1073741824,
+        'gibibytes': 1073741824,
+        'TiB': 1099511627776,
+        'tib': 1099511627776,
+        'tebibyte': 1099511627776,
+        'tebibytes': 1099511627776
+    },
+    
+    // Data Transfer Rate
+    'data-rate': {
+        'bps': 1,
+        'bit/s': 1,
+        'bits-per-second': 1,
+        'Kbps': 1000,
+        'kbps': 1000,
+        'Kbit/s': 1000,
+        'kbit/s': 1000,
+        'kilobits-per-second': 1000,
+        'Mbps': 1000000,
+        'mbps': 1000000,
+        'Mbit/s': 1000000,
+        'mbit/s': 1000000,
+        'megabits-per-second': 1000000,
+        'Gbps': 1000000000,
+        'gbps': 1000000000,
+        'Gbit/s': 1000000000,
+        'gbit/s': 1000000000,
+        'gigabits-per-second': 1000000000,
+        'Tbps': 1000000000000,
+        'tbps': 1000000000000,
+        'Tbit/s': 1000000000000,
+        'tbit/s': 1000000000000,
+        'terabits-per-second': 1000000000000,
+        'B/s': 8,
+        'byte/s': 8,
+        'bytes-per-second': 8,
+        'KB/s': 8000,
+        'kb/s': 8000,
+        'kilobytes-per-second': 8000,
+        'MB/s': 8000000,
+        'mb/s': 8000000,
+        'megabytes-per-second': 8000000,
+        'GB/s': 8000000000,
+        'gb/s': 8000000000,
+        'gigabytes-per-second': 8000000000
+    },
+    
+    // Frequency
+    frequency: {
+        Hz: 1,
+        hertz: 1,
+        kHz: 1000,
+        'khz': 1000,
+        kilohertz: 1000,
+        MHz: 1000000,
+        'mhz': 1000000,
+        megahertz: 1000000,
+        GHz: 1000000000,
+        'ghz': 1000000000,
+        gigahertz: 1000000000,
+        THz: 1000000000000,
+        'thz': 1000000000000,
+        terahertz: 1000000000000,
+        'rpm': 0.0166667,
+        'revolutions-per-minute': 0.0166667,
+        'rps': 1,
+        'revolutions-per-second': 1
+    },
+    
+    // Angle
+    angle: {
+        rad: 1,
+        radian: 1,
+        radians: 1,
+        deg: Math.PI / 180,
+        degree: Math.PI / 180,
+        degrees: Math.PI / 180,
+        '°': Math.PI / 180,
+        grad: Math.PI / 200,
+        gradian: Math.PI / 200,
+        gradians: Math.PI / 200,
+        'gon': Math.PI / 200,
+        'arcmin': Math.PI / 10800,
+        'arc-minute': Math.PI / 10800,
+        'arc-minutes': Math.PI / 10800,
+        "'": Math.PI / 10800,
+        'arcsec': Math.PI / 648000,
+        'arc-second': Math.PI / 648000,
+        'arc-seconds': Math.PI / 648000,
+        '"': Math.PI / 648000
+    },
+    
+    // Force
+    force: {
+        N: 1,
+        newton: 1,
+        newtons: 1,
+        kN: 1000,
+        'kn': 1000,
+        kilonewton: 1000,
+        kilonewtons: 1000,
+        'lbf': 4.44822,
+        'lb-f': 4.44822,
+        'pound-force': 4.44822,
+        'pounds-force': 4.44822,
+        'lbf': 4.44822,
+        dyne: 0.00001,
+        dynes: 0.00001,
+        'kgf': 9.80665,
+        'kg-f': 9.80665,
+        'kilogram-force': 9.80665,
+        'kilopond': 9.80665,
+        'kp': 9.80665
+    },
+    
+    // Fuel Economy - handled separately with inverse conversion function
+    // Note: This category exists for unit recognition but conversions use convertFuelEconomy()
+    'fuel-economy': {
+        'mpg': 1,
+        'miles-per-gallon': 1,
+        'L/100km': 1,
+        'l/100km': 1,
+        'liters-per-100km': 1,
+        'litres-per-100km': 1,
+        'km/L': 1,
+        'km/l': 1,
+        'kilometers-per-liter': 1,
+        'kilometres-per-litre': 1,
+        'mpg-us': 1,
+        'mpg-uk': 1,
+        'miles-per-gallon-uk': 1
+    },
+    
+    // Density
+    density: {
+        'kg/m³': 1,
+        'kg/m3': 1,
+        'kilogram-per-cubic-meter': 1,
+        'kilogram-per-cubic-metre': 1,
+        'g/cm³': 1000,
+        'g/cm3': 1000,
+        'gram-per-cubic-centimeter': 1000,
+        'gram-per-cubic-centimetre': 1000,
+        'g/mL': 1000,
+        'g/ml': 1000,
+        'gram-per-milliliter': 1000,
+        'gram-per-millilitre': 1000,
+        'lb/ft³': 16.0185,
+        'lb/ft3': 16.0185,
+        'pound-per-cubic-foot': 16.0185,
+        'lb/in³': 27679.9,
+        'lb/in3': 27679.9,
+        'pound-per-cubic-inch': 27679.9,
+        'oz/in³': 1729.99,
+        'oz/in3': 1729.99,
+        'ounce-per-cubic-inch': 1729.99,
+        'oz/ft³': 1.00115,
+        'oz/ft3': 1.00115,
+        'ounce-per-cubic-foot': 1.00115,
+        'kg/L': 1000,
+        'kg/l': 1000,
+        'kilogram-per-liter': 1000,
+        'kilogram-per-litre': 1000
     }
 };
 
@@ -360,8 +688,95 @@ var CURRENCIES = {
     CAD: 1.25,
     AUD: 1.35,
     CHF: 0.92,
-    CNY: 6.45
+    CNY: 6.45,
+    MXN: 0.059
 };
+
+// Currency update functions
+var CURRENCY_UPDATE_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Fetch latest currency rates from API
+async function fetchCurrencyRates() {
+    try {
+        // Using exchangerate-api.com (free, no API key required)
+        var response = await fetch('https://api.exchangerate-api.com/v4/latest/USD');
+        if (!response.ok) {
+            throw new Error('Failed to fetch currency rates');
+        }
+        var data = await response.json();
+        
+        // Convert rates to our format (USD = 1, others relative to USD)
+        var rates = { USD: 1 };
+        if (data.rates) {
+            // Store rates as they come from API (already relative to USD)
+            for (var currency in data.rates) {
+                rates[currency] = data.rates[currency];
+            }
+        }
+        
+        return rates;
+    } catch (error) {
+        console.log('Currency API fetch failed:', error);
+        return null;
+    }
+}
+
+// Load currency rates from storage or fetch if needed
+async function loadCurrencyRates() {
+    return new Promise(function(resolve) {
+        if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
+            chrome.storage.local.get(['currencyRates', 'currencyRatesTimestamp'], function(result) {
+                var now = Date.now();
+                var timestamp = result.currencyRatesTimestamp || 0;
+                var rates = result.currencyRates;
+                
+                // Check if rates are stale (older than 24 hours) or missing
+                if (!rates || (now - timestamp) > CURRENCY_UPDATE_INTERVAL) {
+                    // Fetch new rates
+                    fetchCurrencyRates().then(function(newRates) {
+                        if (newRates) {
+                            // Update CURRENCIES object
+                            for (var currency in newRates) {
+                                CURRENCIES[currency] = newRates[currency];
+                            }
+                            // Save to storage
+                            chrome.storage.local.set({
+                                currencyRates: newRates,
+                                currencyRatesTimestamp: now
+                            });
+                            resolve(newRates);
+                        } else {
+                            // API failed, use existing rates or defaults
+                            if (rates) {
+                                for (var currency in rates) {
+                                    CURRENCIES[currency] = rates[currency];
+                                }
+                            }
+                            resolve(rates || CURRENCIES);
+                        }
+                    });
+                } else {
+                    // Rates are still fresh, use cached rates
+                    if (rates) {
+                        for (var currency in rates) {
+                            CURRENCIES[currency] = rates[currency];
+                        }
+                    }
+                    resolve(rates || CURRENCIES);
+                }
+            });
+        } else {
+            // Not in Chrome extension context, use default rates
+            resolve(CURRENCIES);
+        }
+    });
+}
+
+// Initialize currency rates on load
+if (typeof window !== 'undefined') {
+    // Load rates when units.js is loaded
+    loadCurrencyRates();
+}
 
 // Temperature conversion functions
 function convertTemperature(value, fromUnit, toUnit) {
@@ -383,6 +798,46 @@ function convertTemperature(value, fromUnit, toUnit) {
         case 'K': return celsius + 273.15;
         case 'R': return (celsius + 273.15) * 9/5;
         default: return null;
+    }
+}
+
+// Fuel economy conversion functions (inverse relationship)
+function convertFuelEconomy(value, fromUnit, toUnit) {
+    var normalizedFrom = normalizeUnitToken(fromUnit.replace(/\s+/g, '-'));
+    var normalizedTo = normalizeUnitToken(toUnit.replace(/\s+/g, '-'));
+    
+    // Convert to L/100km first (as base unit)
+    var l100km;
+    
+    if (normalizedFrom === 'mpg' || normalizedFrom === 'miles-per-gallon' || fromUnit.toLowerCase().match(/mpg/)) {
+        // mpg to L/100km: 235.214583 / mpg
+        l100km = 235.214583 / value;
+    } else if (normalizedFrom === 'l/100km' || normalizedFrom === 'liters-per-100km' || normalizedFrom === 'litres-per-100km' || fromUnit.toLowerCase().match(/l\/100km/)) {
+        l100km = value;
+    } else if (normalizedFrom === 'km/l' || normalizedFrom === 'kilometers-per-liter' || normalizedFrom === 'kilometres-per-litre' || fromUnit.toLowerCase().match(/km\/l/)) {
+        // km/L to L/100km: 100 / km/L
+        l100km = 100 / value;
+    } else if (normalizedFrom === 'mpg-uk' || normalizedFrom === 'miles-per-gallon-uk') {
+        // UK mpg to L/100km: (235.214583 / 1.20095) / mpg
+        l100km = (235.214583 / 1.20095) / value;
+    } else {
+        return null;
+    }
+    
+    // Convert from L/100km to target unit
+    if (normalizedTo === 'mpg' || normalizedTo === 'miles-per-gallon' || toUnit.toLowerCase().match(/mpg/)) {
+        // L/100km to mpg: 235.214583 / L/100km
+        return 235.214583 / l100km;
+    } else if (normalizedTo === 'l/100km' || normalizedTo === 'liters-per-100km' || normalizedTo === 'litres-per-100km' || toUnit.toLowerCase().match(/l\/100km/)) {
+        return l100km;
+    } else if (normalizedTo === 'km/l' || normalizedTo === 'kilometers-per-liter' || normalizedTo === 'kilometres-per-litre' || toUnit.toLowerCase().match(/km\/l/)) {
+        // L/100km to km/L: 100 / L/100km
+        return 100 / l100km;
+    } else if (normalizedTo === 'mpg-uk' || normalizedTo === 'miles-per-gallon-uk') {
+        // L/100km to UK mpg: (235.214583 / 1.20095) / L/100km
+        return (235.214583 / 1.20095) / l100km;
+    } else {
+        return null;
     }
 }
 
@@ -645,13 +1100,60 @@ function unitsJsCalc(input) {
         }
     }
     
-    // Check for temperature conversions (e.g., "32f to c", "-40 C to F")
+    // Check for temperature conversions (e.g., "32f to c", "-40 C to F", "21C in F", "21 celcius in F")
     var tempMatch = input.match(/^(\-?\d+(?:\.\d+)?)\s*([CFKR])\s+to\s+([CFKR])$/i);
     if (tempMatch) {
         var value = tempMatch[1]; var fromUnit = tempMatch[2]; var toUnit = tempMatch[3];
         var result = convertTemperature(parseFloat(value), fromUnit.toUpperCase(), toUnit.toUpperCase());
         if (result !== null) {
-            return result.toFixed(6)+" "+toUnit.toUpperCase();
+            // Use formatNumber for mathematically correct formatting
+            return formatNumber(result)+" "+toUnit.toUpperCase();
+        }
+    }
+    
+    // Check for temperature conversions with "in" keyword and full word names
+    var tempInMatch = input.match(/^(\-?\d+(?:\.\d+)?)\s+([a-zA-Z]+)\s+in\s+([a-zA-Z]+)$/i);
+    if (tempInMatch) {
+        var value = tempInMatch[1];
+        var fromUnitStr = tempInMatch[2].toLowerCase();
+        var toUnitStr = tempInMatch[3].toLowerCase();
+        
+        // Map full word temperature unit names to single letter codes
+        var tempUnitMap = {
+            'c': 'C', 'celsius': 'C', 'celcius': 'C', 'centigrade': 'C',
+            'f': 'F', 'fahrenheit': 'F',
+            'k': 'K', 'kelvin': 'K',
+            'r': 'R', 'rankine': 'R'
+        };
+        
+        var fromUnit = tempUnitMap[fromUnitStr];
+        var toUnit = tempUnitMap[toUnitStr];
+        
+        // Also check if it's a single letter
+        if (!fromUnit && fromUnitStr.length === 1 && /[CFKR]/i.test(fromUnitStr)) {
+            fromUnit = fromUnitStr.toUpperCase();
+        }
+        if (!toUnit && toUnitStr.length === 1 && /[CFKR]/i.test(toUnitStr)) {
+            toUnit = toUnitStr.toUpperCase();
+        }
+        
+        if (fromUnit && toUnit) {
+            var result = convertTemperature(parseFloat(value), fromUnit, toUnit);
+            if (result !== null) {
+                // Use formatNumber for mathematically correct formatting
+                return formatNumber(result)+" "+toUnit;
+            }
+        }
+    }
+    
+    // Also check for single letter temperature units with "in" (e.g., "21C in F")
+    var tempInShortMatch = input.match(/^(\-?\d+(?:\.\d+)?)\s*([CFKR])\s+in\s+([CFKR])$/i);
+    if (tempInShortMatch) {
+        var value = tempInShortMatch[1]; var fromUnit = tempInShortMatch[2]; var toUnit = tempInShortMatch[3];
+        var result = convertTemperature(parseFloat(value), fromUnit.toUpperCase(), toUnit.toUpperCase());
+        if (result !== null) {
+            // Use formatNumber for mathematically correct formatting
+            return formatNumber(result)+" "+toUnit.toUpperCase();
         }
     }
     
@@ -663,6 +1165,18 @@ function unitsJsCalc(input) {
             var usdValue = parseFloat(value) / CURRENCIES[fromCurr.toUpperCase()];
             var result = usdValue * CURRENCIES[toCurr.toUpperCase()];
             return result.toFixed(2)+" "+toCurr.toUpperCase();
+        }
+    }
+    
+    // Check for fuel economy conversions (e.g., "30 mpg to L/100km", "8 L/100km to mpg")
+    var fuelEconMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\/\s0-9]+)\s+(?:to|in)\s+([a-zA-Z\/\s0-9]+)$/i);
+    if (fuelEconMatch) {
+        var value = parseFloat(fuelEconMatch[1]);
+        var fromUnit = fuelEconMatch[2].trim();
+        var toUnit = fuelEconMatch[3].trim();
+        var result = convertFuelEconomy(value, fromUnit, toUnit);
+        if (result !== null) {
+            return formatNumber(result) + " " + toUnit;
         }
     }
     
@@ -982,10 +1496,10 @@ function unitsJsCalc(input) {
         }
     }
     
-    // Check for "in" conversions (e.g., "5mi in km", "1/4 cup in tablespoons")
-    var inMatch = input.match(/^(.+)\s+in\s+([a-zA-Zµ\-²³\/]+)$/i);
+    // Check for "in" conversions (e.g., "5mi in km", "1/4 cup in tablespoons", "100 sqm in sq ft")
+    var inMatch = input.match(/^(.+)\s+in\s+([a-zA-Zµ\-²³\/\s]+)$/i);
     if (inMatch) {
-        var value = inMatch[1]; var targetUnit = inMatch[2];
+        var value = inMatch[1]; var targetUnit = inMatch[2].trim();
         
         // Check if the value contains mixed units with + or -
         if (value.match(/[+\-]/)) {
@@ -1024,21 +1538,21 @@ function unitsJsCalc(input) {
         
         // Handle expressions with extra spaces like "2 km in m"
         var cleanValue = value.replace(/\s+/g, ' ').trim();
-        var cleanSpeedMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\/\-]+)$/);
+        var cleanSpeedMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\/\-\s]+)$/);
         if (cleanSpeedMatch) {
             var cleanSpeedValue = parseFloat(cleanSpeedMatch[1]);
-            var cleanSpeedUnit = cleanSpeedMatch[2];
+            var cleanSpeedUnit = cleanSpeedMatch[2].trim();
             var cleanResult = convertSpeed(cleanSpeedValue, cleanSpeedUnit, targetUnit);
             if (cleanResult !== null) {
                 return cleanResult;
             }
         }
         
-        // Handle expressions with extra spaces for regular units
-        var cleanUnitMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³]+)$/);
+        // Handle expressions with extra spaces for regular units (allow spaces like "sq ft")
+        var cleanUnitMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³\s]+)$/);
         if (cleanUnitMatch) {
             var cleanNumValue = cleanUnitMatch[1];
-            var cleanFromUnit = cleanUnitMatch[2];
+            var cleanFromUnit = cleanUnitMatch[2].trim();
             var cleanResult = processInConversion(cleanNumValue + ' ' + cleanFromUnit, targetUnit);
             if (cleanResult) {
                 return cleanResult;
@@ -1048,10 +1562,10 @@ function unitsJsCalc(input) {
         return processInConversion(value, targetUnit);
     }
     
-    // Check for "to" conversions (e.g., "60 mph to m/s", "32 F to C")
-    var toMatch = input.match(/^(.+)\s+to\s+([a-zA-Zµ\-²³\/]+)$/i);
+    // Check for "to" conversions (e.g., "60 mph to m/s", "32 F to C", "100 sqm to sq ft")
+    var toMatch = input.match(/^(.+)\s+to\s+([a-zA-Zµ\-²³\/\s]+)$/i);
     if (toMatch) {
-        var value = toMatch[1]; var targetUnit = toMatch[2];
+        var value = toMatch[1]; var targetUnit = toMatch[2].trim();
         
         // Check if the value contains mixed units with + or -
         if (value.match(/[+\-]/)) {
@@ -1072,10 +1586,10 @@ function unitsJsCalc(input) {
         }
         
         // Special handling for speed conversions
-        var speedMatch = value.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\/\-]+)$/);
+        var speedMatch = value.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\/\-\s]+)$/);
         if (speedMatch) {
             var speedValue = parseFloat(speedMatch[1]);
-            var speedUnit = speedMatch[2];
+            var speedUnit = speedMatch[2].trim();
             // Try speed conversion first
             var result = convertSpeed(speedValue, speedUnit, targetUnit);
             if (result !== null) {
@@ -1090,21 +1604,21 @@ function unitsJsCalc(input) {
         
         // Handle expressions with extra spaces like "60 mph to m/s"
         var cleanValue = value.replace(/\s+/g, ' ').trim();
-        var cleanSpeedMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\/\-]+)$/);
+        var cleanSpeedMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\/\-\s]+)$/);
         if (cleanSpeedMatch) {
             var cleanSpeedValue = parseFloat(cleanSpeedMatch[1]);
-            var cleanSpeedUnit = cleanSpeedMatch[2];
+            var cleanSpeedUnit = cleanSpeedMatch[2].trim();
             var cleanResult = convertSpeed(cleanSpeedValue, cleanSpeedUnit, targetUnit);
             if (cleanResult !== null) {
                 return cleanResult;
             }
         }
         
-        // Handle expressions with extra spaces for regular units
-        var cleanUnitMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³]+)$/);
+        // Handle expressions with extra spaces for regular units (allow spaces like "sq ft")
+        var cleanUnitMatch = cleanValue.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³\s]+)$/);
         if (cleanUnitMatch) {
             var cleanNumValue = cleanUnitMatch[1];
-            var cleanFromUnit = cleanUnitMatch[2];
+            var cleanFromUnit = cleanUnitMatch[2].trim();
             var cleanResult = processInConversion(cleanNumValue + ' ' + cleanFromUnit, targetUnit);
             if (cleanResult) {
                 return cleanResult;
@@ -1166,7 +1680,7 @@ function convertToBaseUnit(value, unit) {
     var normalizedUnit = normalizeUnitToken(unit);
     
     for (var catKey in UNITS) { if (!UNITS.hasOwnProperty(catKey)) continue; var category = catKey; var units = UNITS[catKey];
-        if (category === 'temperature') continue; // Handle separately
+        if (category === 'temperature' || category === 'fuel-economy') continue; // Handle separately
         
         for (var unitKey in units) { if (!units.hasOwnProperty(unitKey)) continue; var unitName = unitKey; var factor = units[unitKey];
             if (unitName === normalizedUnit || unitName === unit || unitName === unit.toLowerCase()) {
@@ -1196,7 +1710,7 @@ function convertFromBaseUnit(baseValue, baseUnit, targetUnit) {
     var normalizedTargetUnit = normalizeUnitToken(targetUnit);
     
     for (var catKey in UNITS) { if (!UNITS.hasOwnProperty(catKey)) continue; var category = catKey; var units = UNITS[catKey];
-        if (category === 'temperature') continue; // Handle separately
+        if (category === 'temperature' || category === 'fuel-economy') continue; // Handle separately
         
         for (var unitKey in units) { if (!units.hasOwnProperty(unitKey)) continue; var unitName = unitKey; var factor = units[unitKey];
             if (unitName === normalizedTargetUnit || unitName === targetUnit || unitName === targetUnit.toLowerCase()) {
@@ -1411,7 +1925,7 @@ function processMixedUnits(input) {
     var baseUnit = null;
     
     for (var catKey in UNITS) { if (!UNITS.hasOwnProperty(catKey)) continue; var category = catKey; var units = UNITS[catKey];
-        if (category === 'temperature') continue; // Handle separately
+        if (category === 'temperature' || category === 'fuel-economy') continue; // Handle separately
         
         for (var unitKey in units) { if (!units.hasOwnProperty(unitKey)) continue; var unitName = unitKey; var factor = units[unitKey];
             if (unitName === normalizedUnit || unitName === unit || unitName === unit.toLowerCase()) {
@@ -1484,7 +1998,7 @@ function processMixedUnits(input) {
         var valueUnitCategory = null;
         
         for (var catKey in UNITS) { if (!UNITS.hasOwnProperty(catKey)) continue; var category = catKey; var units = UNITS[catKey];
-            if (category === 'temperature') continue; // Handle separately
+            if (category === 'temperature' || category === 'fuel-economy') continue; // Handle separately
             
             for (var unitKey in units) { if (!units.hasOwnProperty(unitKey)) continue; var unitName = unitKey; var factor = units[unitKey];
                 if (unitName === valueNormalizedUnit || unitName === valueUnit || unitName === valueUnit.toLowerCase()) {
@@ -1558,21 +2072,70 @@ function processInConversion(value, targetUnit) {
         value = (parseFloat(num) / parseFloat(den)).toString() + ' ' + unit;
     }
     
-    // Parse the value and unit
-    var unitMatch = value.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\-²³]+)$/);
+    // Parse the value and unit (allow spaces in unit names like "sq ft")
+    var unitMatch = value.match(/^(\d+(?:\.\d+)?)\s*([a-zA-Zµ\-²³\s]+)$/);
     if (!unitMatch) return null;
     
     var numValue = unitMatch[1];
-    var fromUnit = unitMatch[2];
+    var fromUnit = unitMatch[2].trim();
     var number = parseFloat(numValue);
     
-    // Normalize both units (handle plurals, aliases, etc.)
-    var normalizedFromUnit = normalizeUnitToken(fromUnit);
-    var normalizedTargetUnit = normalizeUnitToken(targetUnit);
+    // Normalize both units (handle plurals, aliases, spaces, etc.)
+    // Replace spaces with hyphens for matching, then normalize
+    var normalizedFromUnit = normalizeUnitToken(fromUnit.replace(/\s+/g, '-'));
+    var normalizedTargetUnit = normalizeUnitToken(targetUnit.replace(/\s+/g, '-'));
+    
+    // Special handling: if "oz" (ounce) is used with a volume target, treat it as fluid ounce
+    var isTargetVolume = false;
+    for (var checkCat in UNITS) {
+        if (!UNITS.hasOwnProperty(checkCat) || checkCat === 'temperature' || checkCat === 'fuel-economy') continue;
+        var checkUnits = UNITS[checkCat];
+        if (checkCat === 'volume') {
+            for (var checkKey in checkUnits) {
+                if (!checkUnits.hasOwnProperty(checkKey)) continue;
+                var checkUnit = checkKey;
+                if (checkUnit === normalizedTargetUnit || checkUnit === targetUnit || checkUnit === targetUnit.toLowerCase()) {
+                    isTargetVolume = true;
+                    break;
+                }
+            }
+        }
+        if (isTargetVolume) break;
+    }
+    
+    // If converting oz to a volume unit, use fluid ounces instead
+    if ((normalizedFromUnit === 'oz' || fromUnit.toLowerCase() === 'oz' || fromUnit.toLowerCase() === 'ounce' || fromUnit.toLowerCase() === 'ounces') && isTargetVolume) {
+        normalizedFromUnit = 'fl-oz';
+        fromUnit = 'fl-oz';
+    }
+    
+    // Check for fuel economy conversions (inverse relationship)
+    var isFuelEconFrom = false;
+    var isFuelEconTo = false;
+    for (var feCat in UNITS) {
+        if (!UNITS.hasOwnProperty(feCat) || feCat !== 'fuel-economy') continue;
+        var feUnits = UNITS[feCat];
+        for (var feKey in feUnits) {
+            if (!feUnits.hasOwnProperty(feKey)) continue;
+            var feUnit = feKey;
+            if (feUnit === normalizedFromUnit || feUnit === fromUnit || feUnit === fromUnit.toLowerCase() || fromUnit.toLowerCase().match(/mpg|l\/100km|km\/l/)) {
+                isFuelEconFrom = true;
+            }
+            if (feUnit === normalizedTargetUnit || feUnit === targetUnit || feUnit === targetUnit.toLowerCase() || targetUnit.toLowerCase().match(/mpg|l\/100km|km\/l/)) {
+                isFuelEconTo = true;
+            }
+        }
+    }
+    if (isFuelEconFrom && isFuelEconTo) {
+        var fuelResult = convertFuelEconomy(number, fromUnit, targetUnit);
+        if (fuelResult !== null) {
+            return formatNumber(fuelResult) + " " + targetUnit;
+        }
+    }
     
     // Find the unit category and convert to target unit
     for (var catKey in UNITS) { if (!UNITS.hasOwnProperty(catKey)) continue; var category = catKey; var units = UNITS[catKey];
-        if (category === 'temperature') continue; // Handle separately
+        if (category === 'temperature' || category === 'fuel-economy') continue; // Handle separately
         
         for (var unitKey in units) { if (!units.hasOwnProperty(unitKey)) continue; var unitName = unitKey; var factor = units[unitKey];
             if (unitName === normalizedFromUnit || unitName === fromUnit || unitName === fromUnit.toLowerCase()) {
@@ -1653,7 +2216,15 @@ var UNIT_ALIASES = {
     'centimetres':'centimetre', 'centimeters':'centimeter',
     'millimetres':'millimetre', 'millimeters':'millimeter',
     'nanometres':'nanometre', 'nanometers':'nanometer',
-    'micrometres':'micrometre', 'micrometers':'micrometer'
+    'micrometres':'micrometre', 'micrometers':'micrometer',
+    // Area unit aliases
+    'sqm':'sq-m', 'sq m':'sq-m',
+    'sqft':'sq-ft', 'sq ft':'sq-ft',
+    'sqkm':'sq-km', 'sq km':'sq-km',
+    'sqcm':'sq-cm', 'sq cm':'sq-cm',
+    'sqmi':'sq-mi', 'sq mi':'sq-mi',
+    'sqyd':'sq-yd', 'sq yd':'sq-yd',
+    'sqin':'sq-in', 'sq in':'sq-in'
 };
 function normalizeUnitToken(u){ 
     if(!u) return u; 
