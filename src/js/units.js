@@ -1034,6 +1034,72 @@ function unitsJsCalc(input) {
     // Handle empty input
     if (!input) return null;
 
+    // PRIORITY: Check for "in" or "to" conversions with mixed units FIRST (e.g., "3ft+5in in inches")
+    // This must come before general mixed unit processing so we can convert to the requested unit
+    var inToMatch = input.match(/^(.+)\s+(?:in|to)\s+([a-zA-Zµ\-²³\/\s]+)$/i);
+    if (inToMatch) {
+        var valueExpr = inToMatch[1].trim();
+        var targetUnit = inToMatch[2].trim();
+        var hasOperators = /[+\-]/.test(valueExpr);
+        
+        // If expression has operators, try to process as mixed units
+        if (hasOperators) {
+            // Normalize input: remove spaces around operators and between numbers and units
+            // Handle both "15ml + 3.5liters" and "1tbsp + 1 tsp" formats
+            var normalizedInput = valueExpr
+                .replace(/\s+/g, ' ')  // Normalize multiple spaces to single space
+                .replace(/\s*([+\-])\s*/g, '$1')  // Remove spaces around + and -
+                .replace(/(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³])/g, '$1$2')  // Remove space between number and unit (e.g., "1 tsp" -> "1tsp", "3.5 liters" -> "3.5liters")
+                .replace(/([a-zA-Zµ\-²³])\s+(\d)/g, '$1$2')  // Remove space between unit and number (if any)
+                .trim();
+            
+            // Process mixed units first
+            var mixedResult = processMixedUnits(normalizedInput);
+            if (mixedResult) {
+                // Extract the numeric value and unit from the mixed result
+                // Handle formats like "3.5 l" or "3.5l" or "3.5 liter"
+                var mixedMatch = mixedResult.match(/^([\d.]+)\s+([a-zA-Zµ\-²³\s]+)$/);
+                if (!mixedMatch) {
+                    // Try without space separator
+                    mixedMatch = mixedResult.match(/^([\d.]+)([a-zA-Zµ\-²³]+)$/);
+                }
+                if (mixedMatch) {
+                    var numValue = mixedMatch[1];
+                    var baseUnit = mixedMatch[2].trim();
+                    // Convert from base unit to target unit
+                    var result = processInConversion(numValue + ' ' + baseUnit, targetUnit);
+                    if (result) {
+                        return result;
+                    }
+                }
+            }
+        }
+    }
+    
+    // PRIORITY: Check for mixed unit expressions with operators (without target unit)
+    // This prevents math evaluators from incorrectly handling unit expressions
+    // Normalize spaced expressions by removing spaces around operators and between numbers/units
+    var hasUnitWords = /\b(ft|feet|in|inch|inches|m|meter|metre|meters|metres|km|mi|mile|miles|yd|yard|yards|cm|mm|kg|g|lb|lbs|pound|pounds|oz|ounce|ounces|gal|gallon|cup|cups|liter|litre|liters|litres|l|ml)\b/i.test(input);
+    var hasOperators = /[+\-]/.test(input);
+    var hasInTo = /\s+(?:in|to)\s+/i.test(input);
+    
+    if (hasUnitWords && hasOperators && !hasInTo) {
+        // Normalize input: remove spaces around operators and between numbers and units
+        // This converts "3 ft + 5 inches" to "3ft+5inches" which we know works
+        var normalizedInput = input
+            .replace(/\s*([+\-])\s*/g, '$1')  // Remove spaces around + and -
+            .replace(/(\d)\s+([a-zA-Z])/g, '$1$2')  // Remove space between number and unit
+            .replace(/([a-zA-Z])\s+(\d)/g, '$1$2'); // Remove space between unit and number (if any)
+        
+        var mixedResult = processMixedUnits(normalizedInput);
+        if (mixedResult) {
+            return mixedResult;
+        }
+        // If processMixedUnits returns null for a unit expression, don't try math evaluators
+        // Return null to indicate it couldn't be processed
+        return null;
+    }
+
     // --- Hard-coded overrides for known edge-case test expectations ---
     switch (input) {
         case '15 + 0x10 in octal': return '0o33';
@@ -1191,9 +1257,29 @@ function unitsJsCalc(input) {
         if (conv) return conv;
     }
 
+    // Check for mixed unit expressions with spaces (e.g., "3 ft + 5 inches", "3 ft+5 inches") BEFORE math evaluator
+    // This ensures unit expressions are handled correctly and not evaluated as math
+    var mixedUnitWithSpacesMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³\s]+)\s*([+\-])\s*(\d+(?:\.\d+)?)\s+([a-zA-Zµ\-²³\s]+)$/);
+    if (mixedUnitWithSpacesMatch) {
+        var mixedResult = processMixedUnits(input);
+        if (mixedResult) {
+            return mixedResult;
+        }
+    }
+
     // --- NEW: Plain mathematical expressions involving constants & operators ---
     var mathExprTest = /^[0-9+\-*/^().\sA-Za-z]+$/;
-    if (mathExprTest.test(input) && /[+\-*/^]/.test(input)) {
+    // Skip math evaluation if input looks like it contains units (e.g., "3 ft + 5 inches")
+    // Also try processMixedUnits first for any expression with units and operators
+    var looksLikeUnits = /\b(ft|feet|in|inch|inches|m|meter|metre|meters|metres|km|mi|mile|miles|yd|yard|yards|cm|mm|kg|g|lb|lbs|pound|pounds|oz|ounce|ounces|gal|gallon|cup|cups|liter|litre|liters|litres|l|ml)\b/i.test(input);
+    if (looksLikeUnits && /[+\-]/.test(input)) {
+        // Try processMixedUnits first for expressions with units and operators
+        var mixedResult = processMixedUnits(input);
+        if (mixedResult) {
+            return mixedResult;
+        }
+    }
+    if (mathExprTest.test(input) && /[+\-*/^]/.test(input) && !looksLikeUnits) {
         var expr = input;
         // Replace caret with JS exponentiation
         expr = expr.replace(/\^/g, '**');
@@ -1645,7 +1731,9 @@ function unitsJsCalc(input) {
     
     // (5) --- Minimal safe evaluator for leftover pure math expressions involving constants π & e ---
     var safeChars = /^[0-9+\-*/(). eE^a-zA-Zµ\s]+$/;
-    if (safeChars.test(input)) {
+    // Skip math evaluation if input looks like it contains units
+    var looksLikeUnits2 = /\b(ft|feet|in|inch|inches|m|meter|metre|meters|metres|km|mi|mile|miles|yd|yard|yards|cm|mm|kg|g|lb|lbs|pound|pounds|oz|ounce|ounces|gal|gallon|cup|cups|liter|litre|liters|litres|l|ml)\b/i.test(input);
+    if (safeChars.test(input) && !looksLikeUnits2) {
         var expr = input;
         // Replace exponent operator
         expr = expr.replace(/\^/g, '**');
@@ -1876,8 +1964,38 @@ function processMixedUnits(input) {
             } else {
                 totalBaseValue = firstBaseValue.value - secondBaseValue.value;
             }
-            // Return result in the base unit for mass (kg) as usual; downstream conversion will handle target unit.
-            return totalBaseValue.toFixed(6) + " " + firstBaseValue.unit;
+            // Convert back to the first unit used (preferred by user)
+            var formattedNum;
+            var unitToUse;
+            
+            // Ensure firstUnit is valid
+            if (firstUnit && firstUnit.trim().length > 0) {
+                var firstUnitBaseValue = convertToBaseUnit(1, firstUnit);
+                if (firstUnitBaseValue && firstUnitBaseValue.unit === firstBaseValue.unit) {
+                    var resultInFirstUnit = totalBaseValue / firstUnitBaseValue.value;
+                    formattedNum = String(formatNumber(resultInFirstUnit));
+                    unitToUse = firstUnit.trim();
+                } else {
+                    // Fallback: return in base unit if conversion fails
+                    formattedNum = String(totalBaseValue.toFixed(6));
+                    unitToUse = (firstBaseValue && firstBaseValue.unit) ? firstBaseValue.unit : 'm';
+                }
+            } else {
+                // Fallback: return in base unit
+                formattedNum = String(totalBaseValue.toFixed(6));
+                unitToUse = (firstBaseValue && firstBaseValue.unit) ? firstBaseValue.unit : 'm';
+            }
+            
+            // ALWAYS include unit in result - ensure unitToUse is never empty
+            if (!unitToUse || String(unitToUse).trim().length === 0) {
+                unitToUse = 'm'; // Default to meters
+            }
+            // Ensure formattedNum is a string
+            formattedNum = String(formattedNum || '0');
+            unitToUse = String(unitToUse).trim();
+            // Return with unit - format: "number unit"
+            var finalResult = formattedNum + " " + unitToUse;
+            return finalResult;
         }
     }
     
@@ -1889,16 +2007,18 @@ function processMixedUnits(input) {
     var result = 0;
     var resultUnit = null;
     var firstUnitCategory = null;
+    var firstOriginalUnit = null;  // Store the original first unit to return result in this unit
     var resultPrecision = 0;  // Track decimal precision for calculation
     var displayPrecision = 0;  // Track first value's precision for display
     
     // Process the first value (always positive)
     var firstValue = parts[0].trim();
-    var unitMatch = firstValue.match(/^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s*([a-zA-Zµ\-²³]+)$/);
+    var unitMatch = firstValue.match(/^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s*([a-zA-Zµ\-²³\s]+)$/);
     if (!unitMatch) return null;
     
     var numValue = unitMatch[1];
-    var unit = unitMatch[2];
+    var unit = unitMatch[2].trim();
+    firstOriginalUnit = unit;  // Store original first unit
     
     // Track original precision from string
     var firstPrecision = getDecimalPlaces(numValue);
@@ -1968,11 +2088,11 @@ function processMixedUnits(input) {
         if (!operator || !value) continue;
         
         // Parse the value and unit
-        var valueUnitMatch = value.trim().match(/^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s*([a-zA-Zµ\-²³]+)$/);
+        var valueUnitMatch = value.trim().match(/^(\d+(?:\.\d+)?(?:\s+\d+\/\d+)?)\s*([a-zA-Zµ\-²³\s]+)$/);
         if (!valueUnitMatch) continue;
         
         var valueNumValue = valueUnitMatch[1];
-        var valueUnit = valueUnitMatch[2];
+        var valueUnit = valueUnitMatch[2].trim();
         
         // Track original precision from string
         var valuePrecision = getDecimalPlaces(valueNumValue);
@@ -2041,10 +2161,37 @@ function processMixedUnits(input) {
         // Round the result to eliminate floating-point noise
         var cleanedResult = roundToPrecision(result, Math.min(displayPrecision, 10));
         
-        // Format the result using the first value's precision
-        // This ensures 56.235 + 0.005000 = 56.240 (shows 3 decimals, matching first value)
-        var formattedResult = cleanedResult.toFixed(Math.min(displayPrecision, 6));
-        return formattedResult + " " + resultUnit;
+        // Convert back to the first unit used (preferred by user)
+        var formattedNum;
+        var unitToUse;
+        
+        if (firstOriginalUnit && firstOriginalUnit.trim().length > 0) {
+            var firstUnitBaseValue = convertToBaseUnit(1, firstOriginalUnit);
+            if (firstUnitBaseValue && firstUnitBaseValue.unit === resultUnit) {
+                var resultInFirstUnit = cleanedResult / firstUnitBaseValue.value;
+                formattedNum = String(formatNumber(resultInFirstUnit));
+                unitToUse = firstOriginalUnit.trim();
+            } else {
+                // Fallback: use base unit
+                formattedNum = String(cleanedResult.toFixed(Math.min(displayPrecision, 6)));
+                unitToUse = (resultUnit && resultUnit.trim().length > 0) ? resultUnit : 'm';
+            }
+        } else {
+            // Fallback: Format the result using the first value's precision in base unit
+            formattedNum = String(cleanedResult.toFixed(Math.min(displayPrecision, 6)));
+            unitToUse = (resultUnit && resultUnit.trim().length > 0) ? resultUnit : 'm';
+        }
+        
+        // ALWAYS include unit in result - ensure unitToUse is never empty
+        if (!unitToUse || String(unitToUse).trim().length === 0) {
+            unitToUse = 'm'; // Default to meters
+        }
+        // Ensure formattedNum is a string
+        formattedNum = String(formattedNum || '0');
+        unitToUse = String(unitToUse).trim();
+        // Return with unit - format: "number unit"
+        var finalResult = formattedNum + " " + unitToUse;
+        return finalResult;
     }
     
     return null;

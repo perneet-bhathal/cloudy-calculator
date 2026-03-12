@@ -1043,10 +1043,30 @@ class CloudyCalculator {
         if (typeof result === 'number' && isFinite(result)) {
             displayResult = this.formatNumber(result, inputPrecision);
         } else if (typeof result === 'string') {
-            // Try to parse and format string results too
-            const parsed = parseFloat(result);
-            if (!isNaN(parsed) && isFinite(parsed)) {
-                displayResult = this.formatNumber(parsed, inputPrecision);
+            // Check if result contains a unit (e.g., "3.42 ft", "5 kg")
+            // Unit patterns: space followed by letters/units
+            const unitPattern = /\s+[a-zA-Zµ\-²³]+$/;
+            if (unitPattern.test(result)) {
+                // Result has a unit - preserve it, only format the number part
+                const parts = result.split(/\s+(.+)$/);
+                if (parts.length >= 2) {
+                    const numPart = parts[0];
+                    const unitPart = parts[1];
+                    const parsed = parseFloat(numPart);
+                    if (!isNaN(parsed) && isFinite(parsed)) {
+                        displayResult = this.formatNumber(parsed, inputPrecision) + " " + unitPart;
+                    } else {
+                        displayResult = result; // Keep original if parsing fails
+                    }
+                } else {
+                    displayResult = result; // Keep original format
+                }
+            } else {
+                // No unit - try to parse and format as before
+                const parsed = parseFloat(result);
+                if (!isNaN(parsed) && isFinite(parsed)) {
+                    displayResult = this.formatNumber(parsed, inputPrecision);
+                }
             }
         }
         

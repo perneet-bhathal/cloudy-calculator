@@ -499,9 +499,34 @@
                 try {
                     const result = unitsJsCalc(test.input);
                     
+                    // Helper function to extract numeric value from result (strip units)
+                    function extractNumericValue(str) {
+                        if (!str) return null;
+                        // Handle scientific notation formats: "9.46100000000e+12", "9.461e12", etc.
+                        // Try to match full scientific notation first (handles e+12, e-34, etc.)
+                        const sciMatch = str.match(/^([+\-]?\d+(?:\.\d+)?)[eE]([+\-]?\d+)/);
+                        if (sciMatch) {
+                            const base = parseFloat(sciMatch[1]);
+                            const exp = parseInt(sciMatch[2]);
+                            if (!isNaN(base) && !isNaN(exp)) {
+                                return base * Math.pow(10, exp);
+                            }
+                        }
+                        // Match regular number at the start (may have units after)
+                        const match = str.match(/^([+\-]?\d+(?:\.\d+)?)/);
+                        if (match) {
+                            const parsed = parseFloat(match[1]);
+                            if (!isNaN(parsed)) {
+                                return parsed;
+                            }
+                        }
+                        // Fallback to parseFloat
+                        const parsed = parseFloat(str);
+                        return isNaN(parsed) ? null : parsed;
+                    }
+                    
                     // Handle special cases
-                    if (test.expected === "❌") {
-                        // Should fail gracefully
+                    if (test.expected === "ERROR" || test.expected === "❌") {
                         return result === null ? "PASS" : "FAIL";
                     }
                     
@@ -510,59 +535,121 @@
                     }
                     
                     if (test.expected === "numeric") {
-                        // Just check if it's a number
-                        return result && !isNaN(parseFloat(result)) ? "PASS" : "FAIL";
+                        return result && !isNaN(extractNumericValue(result)) ? "PASS" : "FAIL";
                     }
                     
                     if (test.expected === "finite number") {
-                        // Check if it's a finite number
-                        const num = parseFloat(result);
+                        const num = extractNumericValue(result);
                         return result && isFinite(num) && !isNaN(num) ? "PASS" : "FAIL";
                     }
                     
                     if (test.expected === "NaN/error") {
-                        // Should return NaN or error
-                        const num = parseFloat(result);
+                        const num = extractNumericValue(result);
                         return result === null || isNaN(num) ? "PASS" : "FAIL";
                     }
                     
-                    // Handle approximate matches
-                    if (test.expected.startsWith("≈")) {
-                        const expectedNum = parseFloat(test.expected.substring(1));
-                        const actualNum = parseFloat(result);
-                        if (isNaN(expectedNum) || isNaN(actualNum)) {
-                            return "FAIL";
+                    // Handle expected values with units (e.g., "0 C", "373.15 K")
+                    const expectedWithUnitMatch = test.expected.match(/^([+\-]?\d+(?:\.\d+)?)\s+([A-Z])$/);
+                    if (expectedWithUnitMatch) {
+                        const resultMatch = result ? result.match(/^([+\-]?\d+(?:\.\d+)?)\s+([a-zA-Z]+)$/i) : null;
+                        if (resultMatch) {
+                            const expectedNum = parseFloat(expectedWithUnitMatch[1]);
+                            const resultNum = parseFloat(resultMatch[1]);
+                            const expectedUnit = expectedWithUnitMatch[2].toUpperCase();
+                            const resultUnit = resultMatch[2].toUpperCase();
+                            if (expectedUnit === resultUnit || 
+                                (expectedUnit === 'C' && resultUnit === 'C') ||
+                                (expectedUnit === 'F' && resultUnit === 'F') ||
+                                (expectedUnit === 'K' && resultUnit === 'K') ||
+                                (expectedUnit === 'R' && resultUnit === 'R')) {
+                                return Math.abs(expectedNum - resultNum) < 0.01 ? "PASS" : "FAIL";
+                            }
                         }
-                        // Allow 1% tolerance for approximate matches
-                        const tolerance = Math.abs(expectedNum * 0.01);
-                        return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
+                        return result && result.toLowerCase() === test.expected.toLowerCase() ? "PASS" : "FAIL";
                     }
                     
-                    // Handle scientific notation
-                    if (test.expected.includes("e")) {
+                    // Handle approximate matches (starts with ≈ or garbled versions)
+                    // Check for ≈ symbol (may be garbled in some encodings as â‰ˆ, â%%^, etc.)
+                    const firstChar = test.expected.charAt(0);
+                    const isApproximate = test.expected.startsWith("≈") || 
+                                         test.expected.startsWith("â‰ˆ") ||
+                                         test.expected.startsWith("â%%") ||
+                                         (firstChar && !/[0-9+\-]/.test(firstChar) && !test.expected.match(/^(0x|0o|0b)/i)); // Starts with non-numeric (except +, -, or base prefixes)
+                    
+                    if (isApproximate) {
+                        // Extract the numeric part, skipping any leading non-numeric characters
+                        const expectedStr = test.expected.replace(/^[^\d+\-]+/, "").trim();
+                        // Check if expected has unit (e.g., "≈100 C")
+                        const expectedWithUnit = expectedStr.match(/^([+\-]?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)\s+([A-Z])$/);
+                        if (expectedWithUnit) {
+                            const resultMatch = result ? result.match(/^([+\-]?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)\s+([a-zA-Z]+)$/i) : null;
+                            if (resultMatch) {
+                                const expectedNum = parseFloat(expectedWithUnit[1]);
+                                const resultNum = parseFloat(resultMatch[1]);
+                                const expectedUnit = expectedWithUnit[2].toUpperCase();
+                                const resultUnit = resultMatch[2].toUpperCase();
+                                if (expectedUnit === resultUnit) {
+                                    const tolerance = Math.max(Math.abs(expectedNum * 0.01), 0.01);
+                                    return Math.abs(resultNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
+                                }
+                            }
+                            return "FAIL";
+                        } else {
+                            // Expected is just a number, extract number from result (which may have units)
+                            const expectedNum = parseFloat(expectedStr);
+                            const actualNum = extractNumericValue(result);
+                            if (isNaN(expectedNum) || isNaN(actualNum) || actualNum === null) {
+                                return "FAIL";
+                            }
+                            // Special case: if one is zero and the other is not, they must be very close
+                            if ((expectedNum === 0) !== (actualNum === 0)) {
+                                return "FAIL";
+                            }
+                            // Use relative tolerance: 1% for normal numbers, but for very small numbers use smaller absolute tolerance
+                            // For numbers < 1, use 1% relative tolerance with a minimum based on magnitude
+                            // For numbers >= 1, use 1% relative tolerance with minimum 0.0001
+                            let tolerance;
+                            if (Math.abs(expectedNum) < 1) {
+                                // For small numbers, use 1% relative tolerance, but with a reasonable minimum
+                                tolerance = Math.max(Math.abs(expectedNum * 0.01), Math.abs(expectedNum * 1e-10));
+                            } else {
+                                // For larger numbers, use 1% relative tolerance with minimum 0.0001
+                                tolerance = Math.max(Math.abs(expectedNum * 0.01), 0.0001);
+                            }
+                            const diff = Math.abs(actualNum - expectedNum);
+                            return diff <= tolerance ? "PASS" : "FAIL";
+                        }
+                    }
+                    
+                    // Handle scientific notation (without ≈)
+                    const isSciNotation = (test.expected.includes("e") || test.expected.includes("E")) && 
+                                         !test.expected.startsWith("≈") && 
+                                         !test.expected.startsWith("â‰ˆ") &&
+                                         !/^[^\d+\-]/.test(test.expected);
+                    if (isSciNotation) {
                         const expectedNum = parseFloat(test.expected);
-                        const actualNum = parseFloat(result);
-                        if (isNaN(expectedNum) || isNaN(actualNum)) {
+                        const actualNum = extractNumericValue(result);
+                        if (isNaN(expectedNum) || isNaN(actualNum) || actualNum === null) {
                             return "FAIL";
                         }
-                        // Allow 1% tolerance for scientific notation
-                        const tolerance = Math.abs(expectedNum * 0.01);
+                        const tolerance = Math.max(Math.abs(expectedNum * 0.01), Math.abs(expectedNum * 1e-10));
                         return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
                     }
                     
-                    // Exact match
+                    // Exact match for hex/octal/binary
                     if (test.expected.includes("0x") || test.expected.includes("0o") || test.expected.includes("0b")) {
-                        // Hex/octal/binary - exact match
                         return result === test.expected ? "PASS" : "FAIL";
                     }
                     
-                    // Regular number comparison
+                    // Regular number comparison - extract numeric value from result
                     const expectedNum = parseFloat(test.expected);
-                    const actualNum = parseFloat(result);
-                    if (isNaN(expectedNum) || isNaN(actualNum)) {
+                    const actualNum = extractNumericValue(result);
+                    if (isNaN(expectedNum) || isNaN(actualNum) || actualNum === null) {
                         return "FAIL";
                     }
-                    return Math.abs(actualNum - expectedNum) < 0.0001 ? "PASS" : "FAIL";
+                    // Use small tolerance for floating point comparison
+                    const tolerance = Math.max(Math.abs(expectedNum * 1e-10), 0.0001);
+                    return Math.abs(actualNum - expectedNum) < tolerance ? "PASS" : "FAIL";
                     
                 } catch (error) {
                     return "ERROR";
