@@ -30,12 +30,13 @@ ul {list-style-type:none; margin-left:-15px;}
 	Results
 */
 #calcResultsWrapper {
-	position:relative; margin: 1px 8px; margin-top:58px;
+	position:relative; margin: 0 8px; margin-top:44px;
 	font-family:times, serif;
 	background-color:rgba(221,234,249,.5); border:solid #3E5785 1px;
 	-webkit-box-shadow: 0px 0px 3px black; -webkit-border-radius: 0px;
 	overflow:auto;
-	max-height: calc(100vh - 140px);
+	height: calc(100% - 50px);
+	max-height: none;
 }
 #calcResultsWrapperCell {
 	height: 100%;
@@ -154,7 +155,7 @@ ul {list-style-type:none; margin-left:-15px;}
 	hyphens: auto;
 	overflow: hidden;
 }
-#calcInputWrapper {position:relative; margin:7px 8px 6px;}
+#calcInputWrapper {position:relative; margin:3px 8px 2px;}
 #calcInputInnerWrapper {	position:relative;}
 #inputMarker {
 	position:absolute;	left:8px; bottom:1px;

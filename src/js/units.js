@@ -689,8 +689,37 @@ var CURRENCIES = {
     AUD: 1.35,
     CHF: 0.92,
     CNY: 6.45,
-    MXN: 0.059
+    // Rates are expressed as: 1 USD = X currency units.
+    MXN: 17.0
 };
+
+// Currency name to code mapping
+var CURRENCY_NAMES = {
+    'usd': 'USD', 'dollar': 'USD', 'dollars': 'USD', 'us dollar': 'USD',
+    'eur': 'EUR', 'euro': 'EUR', 'euros': 'EUR',
+    'gbp': 'GBP', 'pound': 'GBP', 'pounds': 'GBP', 'british pound': 'GBP', 'sterling': 'GBP',
+    'jpy': 'JPY', 'yen': 'JPY', 'japanese yen': 'JPY',
+    'cad': 'CAD', 'canadian dollar': 'CAD', 'canadian dollars': 'CAD',
+    'aud': 'AUD', 'australian dollar': 'AUD', 'australian dollars': 'AUD',
+    'chf': 'CHF', 'swiss franc': 'CHF', 'franc': 'CHF', 'francs': 'CHF',
+    'cny': 'CNY', 'yuan': 'CNY', 'chinese yuan': 'CNY', 'renminbi': 'CNY', 'rmb': 'CNY',
+    'mxn': 'MXN', 'peso': 'MXN', 'pesos': 'MXN', 'mexican peso': 'MXN'
+};
+
+// Helper function to normalize currency name/code to 3-letter code
+function normalizeCurrency(currency) {
+    if (!currency) return null;
+    var normalized = currency.trim().toLowerCase();
+    // Check if it's already a 3-letter code
+    if (normalized.length === 3 && CURRENCIES[normalized.toUpperCase()]) {
+        return normalized.toUpperCase();
+    }
+    // Check currency name mapping
+    if (CURRENCY_NAMES[normalized]) {
+        return CURRENCY_NAMES[normalized];
+    }
+    return null;
+}
 
 // Currency update functions
 var CURRENCY_UPDATE_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -1223,14 +1252,22 @@ function unitsJsCalc(input) {
         }
     }
     
-    // Check for currency conversions (e.g., "100 USD to EUR")
-    var currencyMatch = input.match(/^(\d+(?:\.\d+)?)\s+([A-Z]{3})\s+to\s+([A-Z]{3})$/i);
+    // Check for currency conversions (e.g., "100 USD to EUR", "1 euro in usd", "1 euro to usd")
+    // Allow trailing equals sign or other characters
+    var currencyMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\s]+)\s+(?:to|in)\s+([a-zA-Z\s]+)(?:\s*=|$)/i);
     if (currencyMatch) {
-        var value = currencyMatch[1]; var fromCurr = currencyMatch[2]; var toCurr = currencyMatch[3];
-        if (CURRENCIES[fromCurr.toUpperCase()] && CURRENCIES[toCurr.toUpperCase()]) {
-            var usdValue = parseFloat(value) / CURRENCIES[fromCurr.toUpperCase()];
-            var result = usdValue * CURRENCIES[toCurr.toUpperCase()];
-            return result.toFixed(2)+" "+toCurr.toUpperCase();
+        var value = currencyMatch[1];
+        var fromCurrStr = currencyMatch[2].trim();
+        var toCurrStr = currencyMatch[3].trim();
+        
+        // Normalize currency names/codes to 3-letter codes
+        var fromCurr = normalizeCurrency(fromCurrStr);
+        var toCurr = normalizeCurrency(toCurrStr);
+        
+        if (fromCurr && toCurr && CURRENCIES[fromCurr] && CURRENCIES[toCurr]) {
+            var usdValue = parseFloat(value) / CURRENCIES[fromCurr];
+            var result = usdValue * CURRENCIES[toCurr];
+            return result.toFixed(2)+" "+toCurr;
         }
     }
     

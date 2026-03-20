@@ -1,6 +1,6 @@
 {
 	"name": "Cloudy Calculator",
-	"version": "1.0.18",
+	"version": "1.0.19",
 	"description": "An Updated & Revived Cloudy Calculator",
 	"manifest_version": 3,
   
@@ -25,7 +25,9 @@
 	],
 	"host_permissions": [
 	  "https://api.exchangerate-api.com/*",
-	  "https://openrouter.ai/*",
+	  "https://openrouter.ai/*"
+	],
+	"optional_host_permissions": [
 	  "http://www.google.com/*",
 	  "https://www.google.com/*"
 	],

@@ -1,7 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Scientific Notation Tests</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; }
@@ -13,7 +14,23 @@
 <body>
   <h1>Scientific Notation Tests</h1>
   <div id="results"></div>
+  <div style="display:none">
+    <textarea id="calcInput" aria-label="calc input"></textarea>
+    <ul id="calcResults"></ul>
+    <div id="calcResultsWrapper"></div>
+    <a id="clearAll" href="#">Clear</a>
+    <a id="popOut" href="#">Popout</a>
+    <div id="calcWrapper"></div>
+    <div id="chromeyCalcName"></div>
+  </div>
 
+  <script>
+    window.chrome = window.chrome || {};
+    chrome.storage = chrome.storage || {};
+    chrome.storage.local = chrome.storage.local || { async get(){ return {}; }, async set(){} };
+    chrome.storage.onChanged = chrome.storage.onChanged || { addListener(){} };
+    chrome.windows = chrome.windows || { create(_opts, cb){ if (cb) cb(); } };
+  </script>
   <script src="src/js/popup.js"></script>
   <script>
     function approxEqual(a, b, eps = 1e-12) {

@@ -1,6 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cloudy Calculator - Comprehensive Test Suite</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -485,6 +487,25 @@
                 this.addTest("100 ABC to USD", "❌", "393. 100 ABC to USD → error (unknown currency)");
                 this.addTest("sin()", "❌", "394. sin() → error");
                 this.addTest("infinite loop?", "❌", "395. infinite loop? (plain text) → error / no result");
+                // --- Manual regression (inputs you verified in the app) ---
+                this.addTest("200 mxn to usd", "11.22", "396. manual: 200 mxn to usd → ~11.22 USD");
+                this.addTest("1 euro to usd", "1.15", "397. manual: 1 euro to usd → ~1.15 USD");
+                this.addTest("15ml + 3 liters to cups", "12.74", "398. manual: 15ml + 3 liters to cups");
+                this.addTest("1tbsp +1tsp to cups", "0.083125", "399. manual: 1tbsp +1tsp to cups");
+                this.addTest("1tbsp +1tsp in cups", "0.083125", "400. manual: 1tbsp +1tsp in cups");
+                this.addTest("3 ft + 5 inches in inches", "41.04", "401. manual: 3 ft + 5 inches in inches");
+                this.addTest("454*5", "2270", "402. manual: 454*5 → 2270");
+                this.addTest("2270+2300", "4570", "403. manual: 2270 + 2300 → 4570");
+                this.addTest("4570-100", "4470", "404. manual: 4570 - 100 → 4470");
+                this.addTest("100c to F", "212", "405. manual: 100c to F → 212 F");
+                this.addTest("99c in f", "210.2", "406. manual: 99c in f → 210.2 F");
+                this.addTest("100 sqm in sq ft", "1076.39", "407. manual: 100 sqm in sq ft");
+                this.addTest("100/14", "7.14", "408. manual: 100/14 → ~7.14");
+                this.addTest("200miles in km", "321.8688", "409. manual: 200 miles in km");
+                this.addTest("((7+8)*3)/5", "9", "410. manual: ((7+8)*3)/5 → 9");
+                this.addTest("log(2)", "0.30", "411. manual: log(2) → ~0.30");
+                this.addTest("pi", "3.14", "412. manual: pi → ~3.14");
+
             }
 
             addTest(input, expected, description) {
@@ -725,6 +746,7 @@
 
         // Initialize test suite
         const testSuite = new TestSuite();
+        window.testSuite = testSuite;
 
         // Global function to run all tests
         function runAllTests() {

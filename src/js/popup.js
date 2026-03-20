@@ -468,8 +468,10 @@ class CloudyCalculator {
             // }
 
             // Check if this looks like a unit conversion query before parsing
-            if (this.looksLikeUnitQuery(input)) {
-                const unitsResult = unitsJsCalc(input);
+            // Strip trailing equals sign for unit queries
+            const inputForUnits = input.replace(/\s*=\s*$/, '');
+            if (this.looksLikeUnitQuery(inputForUnits)) {
+                const unitsResult = unitsJsCalc(inputForUnits);
                 if (unitsResult) {
                     this.addResult(input, unitsResult, 'units');
                     this.variables['@'] = unitsResult;
@@ -755,9 +757,10 @@ class CloudyCalculator {
             consume(); // consume ')'
             
             switch (funcName.toLowerCase()) {
-                case 'sin': return Math.sin(arg);
-                case 'cos': return Math.cos(arg);
-                case 'tan': return Math.tan(arg);
+                // Keep calculator behavior intuitive: trig functions use degrees by default.
+                case 'sin': return Math.sin(arg * Math.PI / 180);
+                case 'cos': return Math.cos(arg * Math.PI / 180);
+                case 'tan': return Math.tan(arg * Math.PI / 180);
                 case 'sqrt': return Math.sqrt(arg);
                 case 'log': return Math.log10(arg);
                 case 'ln': return Math.log(arg);
@@ -1331,6 +1334,8 @@ class CloudyCalculator {
             // "to" conversions (temperature, currency)
             /\d+(?:\.\d+)?\s*[CFKR]\s+to\s+[CFKR]/i,
             /\d+(?:\.\d+)?\s+[A-Z]{3}\s+to\s+[A-Z]{3}/i,
+            // Currency conversions with names (e.g., "1 euro to usd", "1 euro in usd")
+            /\d+(?:\.\d+)?\s+[a-zA-Z\s]+\s+(?:to|in)\s+[a-zA-Z\s]+/i,
             // Number base conversions
             /.+\s+in\s+(hex|octal|binary|decimal)/i,
             // Mathematical functions
