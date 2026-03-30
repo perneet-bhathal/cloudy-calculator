@@ -1,5 +1,23 @@
 // Cloudy Calculator - Safe parser without eval/Function
 
+/**
+ * If a float is within IEEE-754 noise of an integer, return that integer (e.g. 103999.99999999999 → 104000).
+ * Avoids snapping tiny nonzero values (e.g. 1e-12) to 0.
+ */
+function snapNearIntegerFloat(num) {
+    if (typeof num !== 'number' || !isFinite(num)) return num;
+    const r = Math.round(num);
+    const diff = Math.abs(num - r);
+    if (r === 0) {
+        if (diff < 1e-15) return 0;
+        return num;
+    }
+    if (Math.abs(r) > Number.MAX_SAFE_INTEGER) return num;
+    const tol = Math.max(1e-9, Math.abs(r) * 1e-12);
+    if (diff <= tol) return r;
+    return num;
+}
+
 /*
 // AI-assisted error resolution system
 class AIErrorResolver {
@@ -495,7 +513,7 @@ class CloudyCalculator {
             
             // ALWAYS store result as @ (ensure it's a valid number)
             if (typeof result === 'number' && isFinite(result)) {
-                this.variables['@'] = result;
+                this.variables['@'] = snapNearIntegerFloat(result);
             } else {
                 // If result is not a valid number, set @ to 0
                 this.variables['@'] = 0;
@@ -552,14 +570,15 @@ class CloudyCalculator {
             try {
                 const substituted = this.substituteVariables(expression);
                 const value = this.evaluateExpression(substituted);
-                this.variables[varName] = value;
+                const stored = typeof value === 'number' && isFinite(value) ? snapNearIntegerFloat(value) : value;
+                this.variables[varName] = stored;
                 // Ensure @ is set to a valid number
                 if (typeof value === 'number' && isFinite(value)) {
-                    this.variables['@'] = value;
+                    this.variables['@'] = stored;
                 } else {
                     this.variables['@'] = 0;
                 }
-                this.addResult(input, `${varName} = ${value}`, 'variable');
+                this.addResult(input, `${varName} = ${stored}`, 'variable');
                 return true;
             } catch (error) {
                 // If we get here, both unit conversion and main parser failed
@@ -855,107 +874,65 @@ class CloudyCalculator {
         return result;
     }
     
-    // Extract maximum decimal precision from input string
-    getInputPrecision(input) {
+    /**
+     * Display format from pure arithmetic rules (sig figs / decimal places), or null for heuristic.
+     */
+    getDisplayFormatSpec(input) {
+        if (typeof ArithmeticPrecision === 'undefined') return null;
         if (!input || typeof input !== 'string') return null;
-        
-        // Find all numbers in the input (including decimals)
-        const numberMatches = input.match(/\d+\.\d+/g);
-        if (!numberMatches || numberMatches.length === 0) return null;
-        
-        let maxPrecision = 0;
-        for (const match of numberMatches) {
-            const decimalPart = match.split('.')[1];
-            if (decimalPart) {
-                maxPrecision = Math.max(maxPrecision, decimalPart.length);
-            }
-        }
-        
-        return maxPrecision > 0 ? maxPrecision : null;
+        if (/[a-zA-Z@]/.test(input)) return null;
+        return ArithmeticPrecision.inferDisplayFormatSpec(input);
     }
 
-    formatNumber(num, inputPrecision = null) {
+    formatNumber(num, formatSpec = null) {
         if (typeof num !== 'number' || !isFinite(num)) {
             return num;
         }
-        
-        // If input precision is provided, use it (but still check for artifacts)
-        if (inputPrecision !== null && inputPrecision >= 0 && inputPrecision <= 6) {
-            // For division/multiplication, results may need more precision than inputs
-            // For addition/subtraction, results may need less precision
-            // Check from 6 down to 0, but prioritize input precision
-            const maxPrecision = 6;
-            
-            // Collect valid precisions from maxPrecision down to 0
-            const candidates = [];
-            for (let p = maxPrecision; p >= 0; p--) {
-                const multiplier = Math.pow(10, p);
-                const rounded = Math.round(num * multiplier) / multiplier;
-                const diff = Math.abs(num - rounded);
-                
-                // Use a more lenient tolerance for input-precision-based formatting
-                // This handles division results that aren't exactly representable
-                const tolerance = p <= inputPrecision ? 1e-6 : 1e-9;
-                if (diff < tolerance) {
-                    const formatted = rounded.toFixed(p);
-                    // Check for artifact patterns: excessive trailing zeros (2+ zeros) or long zero sequences
-                    const decimalPart = formatted.split('.')[1] || '';
-                    const trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
-                    // For input precision, be more strict: 2+ trailing zeros is excessive
-                    const hasArtifact = trailingZeros >= 2 || formatted.match(/0{5,}[12]$/);
-                    
-                    if (!hasArtifact) {
-                        candidates.push({
-                            precision: p,
-                            formatted: formatted,
-                            trailingZeros: trailingZeros
-                        });
-                    }
-                }
+
+        const maxDecimalPlaces = 15;
+
+        if (formatSpec && formatSpec.type === 'decimalPlaces' && typeof ArithmeticPrecision !== 'undefined') {
+            const dp = Math.min(maxDecimalPlaces, Math.max(0, formatSpec.n));
+            if (dp === 0) {
+                const z = snapNearIntegerFloat(num);
+                return String(Math.round(z));
             }
-            
-            // Prefer meaningful precision: 1 trailing zero at/below input precision, then 0 trailing zeros
-            if (candidates.length > 0) {
-                // First, try to find 1 trailing zero at or below input precision (within 2 places, but not above)
-                let best = candidates.find(c => c.trailingZeros === 1 && 
-                    c.precision <= inputPrecision && (inputPrecision - c.precision) <= 2);
-                if (!best) {
-                    // Then try 0 trailing zeros at exactly input precision
-                    best = candidates.find(c => c.precision === inputPrecision && c.trailingZeros === 0);
-                }
-                if (!best) {
-                    // Then try 0 trailing zeros at any precision
-                    best = candidates.find(c => c.trailingZeros === 0);
-                }
-                if (!best) {
-                    // Then try 1 trailing zero at any precision
-                    best = candidates.find(c => c.trailingZeros === 1);
-                }
-                if (!best) {
-                    // Fallback to first (highest precision)
-                    best = candidates[0];
-                }
-                return best.formatted;
-            }
-            
-            // If no candidates found with tolerance, use input precision directly
-            // This ensures we at least show the input precision
-            const multiplier = Math.pow(10, inputPrecision);
-            const rounded = Math.round(num * multiplier) / multiplier;
-            return rounded.toFixed(inputPrecision);
+            let v = ArithmeticPrecision.roundToDecimalPlaces(num, dp);
+            v = snapNearIntegerFloat(v);
+            return v.toFixed(dp);
         }
-        
-        // Limit to maximum 6 decimal places to avoid excessive precision
-        // Collect all valid precisions, then choose the best one
+
+        if (formatSpec && formatSpec.type === 'sigFigs' && typeof ArithmeticPrecision !== 'undefined') {
+            let v = snapNearIntegerFloat(num);
+            if (Number.isInteger(v)) {
+                return String(v);
+            }
+            v = ArithmeticPrecision.roundToSignificantFigures(num, formatSpec.n);
+            v = snapNearIntegerFloat(v);
+            if (Number.isInteger(v)) return String(v);
+            let s = v.toPrecision(formatSpec.n);
+            if (!/e/i.test(s)) {
+                s = String(parseFloat(s));
+            }
+            return s;
+        }
+
+        num = snapNearIntegerFloat(num);
+        if (Number.isInteger(num)) {
+            return String(num);
+        }
+
+        // Heuristic when precision is unknown: match float without over-rounding (up to 15 decimal places)
         const candidates = [];
-        
-        for (let decimals = 0; decimals <= 6; decimals++) {
+
+        for (let decimals = 0; decimals <= maxDecimalPlaces; decimals++) {
             const multiplier = Math.pow(10, decimals);
             const rounded = Math.round(num * multiplier) / multiplier;
             const diff = Math.abs(num - rounded);
-            
-            // If the difference is very small (floating-point error), this precision works
-            if (diff < 1e-9) {
+
+            // At 0 decimals, only accept true integers (else 0.01 would "match" 0)
+            const tol = decimals === 0 ? 1e-9 : 0.5 * Math.pow(10, -decimals) + 1e-12;
+            if (diff < tol) {
                 const testFormatted = rounded.toFixed(decimals);
                 // Check for artifact patterns:
                 // 1. Excessive trailing zeros (2+ zeros at the end)
@@ -1001,8 +978,7 @@ class CloudyCalculator {
             
             if (hasFraction) {
                 // For numbers with fractional parts, find the precision that shows meaningful digits
-                // Try precisions from 2 to 6, looking for one that doesn't have excessive trailing zeros
-                for (let decimals = 2; decimals <= 6; decimals++) {
+                for (let decimals = 2; decimals <= maxDecimalPlaces; decimals++) {
                     const multiplier = Math.pow(10, decimals);
                     const rounded = Math.round(num * multiplier) / multiplier;
                     const testFormatted = rounded.toFixed(decimals);
@@ -1014,8 +990,10 @@ class CloudyCalculator {
                         return testFormatted.replace(/\.0+$/, '');
                     }
                 }
-                // If all have excessive trailing zeros, use 2 decimal places as default
-                return num.toFixed(2).replace(/\.0+$/, '');
+                let s = num.toFixed(maxDecimalPlaces);
+                s = s.replace(/(\.\d*?)0+$/, '$1');
+                s = s.replace(/\.$/, '');
+                return s;
             } else {
                 // Integer result - no decimal places needed
                 return Math.round(num).toString();
@@ -1040,11 +1018,10 @@ class CloudyCalculator {
         inputSpan.textContent = `${input} =`;
         
         // Format the result to remove floating-point artifacts
-        // Extract precision from input to preserve meaningful trailing zeros
-        const inputPrecision = this.getInputPrecision(input);
+        const formatSpec = this.getDisplayFormatSpec(input);
         let displayResult = result;
         if (typeof result === 'number' && isFinite(result)) {
-            displayResult = this.formatNumber(result, inputPrecision);
+            displayResult = this.formatNumber(result, formatSpec);
         } else if (typeof result === 'string') {
             // Check if result contains a unit (e.g., "3.42 ft", "5 kg")
             // Unit patterns: space followed by letters/units
@@ -1057,7 +1034,7 @@ class CloudyCalculator {
                     const unitPart = parts[1];
                     const parsed = parseFloat(numPart);
                     if (!isNaN(parsed) && isFinite(parsed)) {
-                        displayResult = this.formatNumber(parsed, inputPrecision) + " " + unitPart;
+                        displayResult = this.formatNumber(parsed, formatSpec) + " " + unitPart;
                     } else {
                         displayResult = result; // Keep original if parsing fails
                     }
@@ -1068,7 +1045,7 @@ class CloudyCalculator {
                 // No unit - try to parse and format as before
                 const parsed = parseFloat(result);
                 if (!isNaN(parsed) && isFinite(parsed)) {
-                    displayResult = this.formatNumber(parsed, inputPrecision);
+                    displayResult = this.formatNumber(parsed, formatSpec);
                 }
             }
         }

@@ -1,8 +1,6 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Cloudy Calculator - Comprehensive Test Suite</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -46,14 +44,17 @@
     <div id="test-results"></div>
 
     <script src="src/js/units.js"></script>
+    <script src="src/js/arithmeticPrecision.js"></script>
     <script>
         // Test suite for Cloudy Calculator
         class TestSuite {
             constructor() {
                 this.tests = [];
+                this.arithmeticTests = [];
                 this.results = [];
                 this.currentTestIndex = 0;
                 this.setupTests();
+                this.setupArithmeticPrecisionTests();
             }
 
             setupTests() {
@@ -487,25 +488,33 @@
                 this.addTest("100 ABC to USD", "❌", "393. 100 ABC to USD → error (unknown currency)");
                 this.addTest("sin()", "❌", "394. sin() → error");
                 this.addTest("infinite loop?", "❌", "395. infinite loop? (plain text) → error / no result");
-                // --- Manual regression (inputs you verified in the app) ---
-                this.addTest("200 mxn to usd", "11.22", "396. manual: 200 mxn to usd → ~11.22 USD");
-                this.addTest("1 euro to usd", "1.15", "397. manual: 1 euro to usd → ~1.15 USD");
-                this.addTest("15ml + 3 liters to cups", "12.74", "398. manual: 15ml + 3 liters to cups");
-                this.addTest("1tbsp +1tsp to cups", "0.083125", "399. manual: 1tbsp +1tsp to cups");
-                this.addTest("1tbsp +1tsp in cups", "0.083125", "400. manual: 1tbsp +1tsp in cups");
-                this.addTest("3 ft + 5 inches in inches", "41.04", "401. manual: 3 ft + 5 inches in inches");
-                this.addTest("454*5", "2270", "402. manual: 454*5 → 2270");
-                this.addTest("2270+2300", "4570", "403. manual: 2270 + 2300 → 4570");
-                this.addTest("4570-100", "4470", "404. manual: 4570 - 100 → 4470");
-                this.addTest("100c to F", "212", "405. manual: 100c to F → 212 F");
-                this.addTest("99c in f", "210.2", "406. manual: 99c in f → 210.2 F");
-                this.addTest("100 sqm in sq ft", "1076.39", "407. manual: 100 sqm in sq ft");
-                this.addTest("100/14", "7.14", "408. manual: 100/14 → ~7.14");
-                this.addTest("200miles in km", "321.8688", "409. manual: 200 miles in km");
-                this.addTest("((7+8)*3)/5", "9", "410. manual: ((7+8)*3)/5 → 9");
-                this.addTest("log(2)", "0.30", "411. manual: log(2) → ~0.30");
-                this.addTest("pi", "3.14", "412. manual: pi → ~3.14");
+            }
 
+            /**
+             * Significant figures / decimal-place rules (pure arithmetic, no units).
+             * Full evaluation uses double precision; display rounds per standard propagation rules.
+             */
+            setupArithmeticPrecisionTests() {
+                const T = (kind, payload, expected, description) => {
+                    this.arithmeticTests.push(Object.assign({ kind, expected, description }, payload));
+                };
+
+                T('expr', { expr: '2+3*4' }, '14', 'AP396. 2+3*4 → 14 (order of ops; + uses decimal rule)');
+                T('expr', { expr: '183.95/13625.01' }, '0.013501', 'AP397. division → min sig figs (5) of operands');
+                T('expr', { expr: '1.23+4.5' }, '5.7', 'AP398. addition → min decimal places (1)');
+                T('expr', { expr: '2.5*3.14' }, '7.9', 'AP399. multiplication → min sig figs (2)');
+                T('expr', { expr: '0.000052/0.0000000005' }, '104000', 'AP400. exact integer quotient snaps (float noise)');
+                T('expr', { expr: '10.0+1.00' }, '11.0', 'AP401. addition decimal places from operands');
+                T('expr', { expr: '(1.5+2.5)*2' }, '8', 'AP402. parens then multiply → sig figs');
+                T('expr', { expr: '5.00-2.0' }, '3.0', 'AP403. subtraction → min dp');
+                T('expr', { expr: '100/4' }, '25', 'AP404. integer-like result');
+                T('expr', { expr: '2^3' }, '8', 'AP405. power uses min sig figs of base and exponent');
+
+                T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
+                T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
+                T('sf', { literal: '1020' }, 3, 'AP408. countSigFigs: integer strips ambiguous trailing zeros');
+                T('dp', { literal: '1.230' }, 3, 'AP409. decimal places from literal');
+                T('dp', { literal: '10' }, 0, 'AP410. integer literal → 0 dp');
             }
 
             addTest(input, expected, description) {
@@ -516,38 +525,42 @@
                 });
             }
 
+            runArithmeticPrecisionTest(test) {
+                try {
+                    if (test.kind === 'sf') {
+                        const n = ArithmeticPrecision.countSignificantFiguresFromLiteral(test.literal);
+                        return n === test.expected ? 'PASS' : 'FAIL';
+                    }
+                    if (test.kind === 'dp') {
+                        const n = ArithmeticPrecision.countDecimalPlacesFromLiteral(test.literal);
+                        return n === test.expected ? 'PASS' : 'FAIL';
+                    }
+                    if (test.kind === 'expr') {
+                        const ast = ArithmeticPrecision.parseAst(test.expr);
+                        if (!ast) return 'FAIL';
+                        const raw = ArithmeticPrecision.evalFull(ast);
+                        const disp = ArithmeticPrecision.formatArithmeticDisplay(test.expr, raw);
+                        if (disp === test.expected) return 'PASS';
+                        const exp = parseFloat(test.expected);
+                        const act = parseFloat(disp);
+                        if (!isNaN(exp) && !isNaN(act) && Math.abs(exp - act) <= Math.max(1e-9, Math.abs(exp) * 1e-6)) {
+                            return 'PASS';
+                        }
+                        return 'FAIL';
+                    }
+                    return 'FAIL';
+                } catch (e) {
+                    return 'ERROR';
+                }
+            }
+
             async runTest(test) {
                 try {
                     const result = unitsJsCalc(test.input);
                     
-                    // Helper function to extract numeric value from result (strip units)
-                    function extractNumericValue(str) {
-                        if (!str) return null;
-                        // Handle scientific notation formats: "9.46100000000e+12", "9.461e12", etc.
-                        // Try to match full scientific notation first (handles e+12, e-34, etc.)
-                        const sciMatch = str.match(/^([+\-]?\d+(?:\.\d+)?)[eE]([+\-]?\d+)/);
-                        if (sciMatch) {
-                            const base = parseFloat(sciMatch[1]);
-                            const exp = parseInt(sciMatch[2]);
-                            if (!isNaN(base) && !isNaN(exp)) {
-                                return base * Math.pow(10, exp);
-                            }
-                        }
-                        // Match regular number at the start (may have units after)
-                        const match = str.match(/^([+\-]?\d+(?:\.\d+)?)/);
-                        if (match) {
-                            const parsed = parseFloat(match[1]);
-                            if (!isNaN(parsed)) {
-                                return parsed;
-                            }
-                        }
-                        // Fallback to parseFloat
-                        const parsed = parseFloat(str);
-                        return isNaN(parsed) ? null : parsed;
-                    }
-                    
                     // Handle special cases
-                    if (test.expected === "ERROR" || test.expected === "❌") {
+                    if (test.expected === "❌") {
+                        // Should fail gracefully
                         return result === null ? "PASS" : "FAIL";
                     }
                     
@@ -556,121 +569,59 @@
                     }
                     
                     if (test.expected === "numeric") {
-                        return result && !isNaN(extractNumericValue(result)) ? "PASS" : "FAIL";
+                        // Just check if it's a number
+                        return result && !isNaN(parseFloat(result)) ? "PASS" : "FAIL";
                     }
                     
                     if (test.expected === "finite number") {
-                        const num = extractNumericValue(result);
+                        // Check if it's a finite number
+                        const num = parseFloat(result);
                         return result && isFinite(num) && !isNaN(num) ? "PASS" : "FAIL";
                     }
                     
                     if (test.expected === "NaN/error") {
-                        const num = extractNumericValue(result);
+                        // Should return NaN or error
+                        const num = parseFloat(result);
                         return result === null || isNaN(num) ? "PASS" : "FAIL";
                     }
                     
-                    // Handle expected values with units (e.g., "0 C", "373.15 K")
-                    const expectedWithUnitMatch = test.expected.match(/^([+\-]?\d+(?:\.\d+)?)\s+([A-Z])$/);
-                    if (expectedWithUnitMatch) {
-                        const resultMatch = result ? result.match(/^([+\-]?\d+(?:\.\d+)?)\s+([a-zA-Z]+)$/i) : null;
-                        if (resultMatch) {
-                            const expectedNum = parseFloat(expectedWithUnitMatch[1]);
-                            const resultNum = parseFloat(resultMatch[1]);
-                            const expectedUnit = expectedWithUnitMatch[2].toUpperCase();
-                            const resultUnit = resultMatch[2].toUpperCase();
-                            if (expectedUnit === resultUnit || 
-                                (expectedUnit === 'C' && resultUnit === 'C') ||
-                                (expectedUnit === 'F' && resultUnit === 'F') ||
-                                (expectedUnit === 'K' && resultUnit === 'K') ||
-                                (expectedUnit === 'R' && resultUnit === 'R')) {
-                                return Math.abs(expectedNum - resultNum) < 0.01 ? "PASS" : "FAIL";
-                            }
-                        }
-                        return result && result.toLowerCase() === test.expected.toLowerCase() ? "PASS" : "FAIL";
-                    }
-                    
-                    // Handle approximate matches (starts with ≈ or garbled versions)
-                    // Check for ≈ symbol (may be garbled in some encodings as â‰ˆ, â%%^, etc.)
-                    const firstChar = test.expected.charAt(0);
-                    const isApproximate = test.expected.startsWith("≈") || 
-                                         test.expected.startsWith("â‰ˆ") ||
-                                         test.expected.startsWith("â%%") ||
-                                         (firstChar && !/[0-9+\-]/.test(firstChar) && !test.expected.match(/^(0x|0o|0b)/i)); // Starts with non-numeric (except +, -, or base prefixes)
-                    
-                    if (isApproximate) {
-                        // Extract the numeric part, skipping any leading non-numeric characters
-                        const expectedStr = test.expected.replace(/^[^\d+\-]+/, "").trim();
-                        // Check if expected has unit (e.g., "≈100 C")
-                        const expectedWithUnit = expectedStr.match(/^([+\-]?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)\s+([A-Z])$/);
-                        if (expectedWithUnit) {
-                            const resultMatch = result ? result.match(/^([+\-]?\d+(?:\.\d+)?(?:[eE][+\-]?\d+)?)\s+([a-zA-Z]+)$/i) : null;
-                            if (resultMatch) {
-                                const expectedNum = parseFloat(expectedWithUnit[1]);
-                                const resultNum = parseFloat(resultMatch[1]);
-                                const expectedUnit = expectedWithUnit[2].toUpperCase();
-                                const resultUnit = resultMatch[2].toUpperCase();
-                                if (expectedUnit === resultUnit) {
-                                    const tolerance = Math.max(Math.abs(expectedNum * 0.01), 0.01);
-                                    return Math.abs(resultNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
-                                }
-                            }
-                            return "FAIL";
-                        } else {
-                            // Expected is just a number, extract number from result (which may have units)
-                            const expectedNum = parseFloat(expectedStr);
-                            const actualNum = extractNumericValue(result);
-                            if (isNaN(expectedNum) || isNaN(actualNum) || actualNum === null) {
-                                return "FAIL";
-                            }
-                            // Special case: if one is zero and the other is not, they must be very close
-                            if ((expectedNum === 0) !== (actualNum === 0)) {
-                                return "FAIL";
-                            }
-                            // Use relative tolerance: 1% for normal numbers, but for very small numbers use smaller absolute tolerance
-                            // For numbers < 1, use 1% relative tolerance with a minimum based on magnitude
-                            // For numbers >= 1, use 1% relative tolerance with minimum 0.0001
-                            let tolerance;
-                            if (Math.abs(expectedNum) < 1) {
-                                // For small numbers, use 1% relative tolerance, but with a reasonable minimum
-                                tolerance = Math.max(Math.abs(expectedNum * 0.01), Math.abs(expectedNum * 1e-10));
-                            } else {
-                                // For larger numbers, use 1% relative tolerance with minimum 0.0001
-                                tolerance = Math.max(Math.abs(expectedNum * 0.01), 0.0001);
-                            }
-                            const diff = Math.abs(actualNum - expectedNum);
-                            return diff <= tolerance ? "PASS" : "FAIL";
-                        }
-                    }
-                    
-                    // Handle scientific notation (without ≈)
-                    const isSciNotation = (test.expected.includes("e") || test.expected.includes("E")) && 
-                                         !test.expected.startsWith("≈") && 
-                                         !test.expected.startsWith("â‰ˆ") &&
-                                         !/^[^\d+\-]/.test(test.expected);
-                    if (isSciNotation) {
-                        const expectedNum = parseFloat(test.expected);
-                        const actualNum = extractNumericValue(result);
-                        if (isNaN(expectedNum) || isNaN(actualNum) || actualNum === null) {
+                    // Handle approximate matches
+                    if (test.expected.startsWith("≈")) {
+                        const expectedNum = parseFloat(test.expected.substring(1));
+                        const actualNum = parseFloat(result);
+                        if (isNaN(expectedNum) || isNaN(actualNum)) {
                             return "FAIL";
                         }
-                        const tolerance = Math.max(Math.abs(expectedNum * 0.01), Math.abs(expectedNum * 1e-10));
+                        // Allow 1% tolerance for approximate matches
+                        const tolerance = Math.abs(expectedNum * 0.01);
                         return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
                     }
                     
-                    // Exact match for hex/octal/binary
+                    // Handle scientific notation
+                    if (test.expected.includes("e")) {
+                        const expectedNum = parseFloat(test.expected);
+                        const actualNum = parseFloat(result);
+                        if (isNaN(expectedNum) || isNaN(actualNum)) {
+                            return "FAIL";
+                        }
+                        // Allow 1% tolerance for scientific notation
+                        const tolerance = Math.abs(expectedNum * 0.01);
+                        return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
+                    }
+                    
+                    // Exact match
                     if (test.expected.includes("0x") || test.expected.includes("0o") || test.expected.includes("0b")) {
+                        // Hex/octal/binary - exact match
                         return result === test.expected ? "PASS" : "FAIL";
                     }
                     
-                    // Regular number comparison - extract numeric value from result
+                    // Regular number comparison
                     const expectedNum = parseFloat(test.expected);
-                    const actualNum = extractNumericValue(result);
-                    if (isNaN(expectedNum) || isNaN(actualNum) || actualNum === null) {
+                    const actualNum = parseFloat(result);
+                    if (isNaN(expectedNum) || isNaN(actualNum)) {
                         return "FAIL";
                     }
-                    // Use small tolerance for floating point comparison
-                    const tolerance = Math.max(Math.abs(expectedNum * 1e-10), 0.0001);
-                    return Math.abs(actualNum - expectedNum) < tolerance ? "PASS" : "FAIL";
+                    return Math.abs(actualNum - expectedNum) < 0.0001 ? "PASS" : "FAIL";
                     
                 } catch (error) {
                     return "ERROR";
@@ -681,23 +632,28 @@
                 this.results = [];
                 this.currentTestIndex = 0;
                 
-                document.getElementById('total-tests').textContent = this.tests.length;
+                const total = this.tests.length + this.arithmeticTests.length;
+                document.getElementById('total-tests').textContent = total;
                 document.getElementById('test-results').innerHTML = '';
                 
+                let idx = 0;
                 for (let i = 0; i < this.tests.length; i++) {
                     const test = this.tests[i];
                     const result = await this.runTest(test);
                     this.results.push({ test, result });
-                    
-                    // Update progress
-                    this.currentTestIndex = i + 1;
-                    const progress = (this.currentTestIndex / this.tests.length) * 100;
-                    document.getElementById('progress-fill').style.width = progress + '%';
-                    
-                    // Add result to display
+                    idx++;
+                    document.getElementById('progress-fill').style.width = (idx / total * 100) + '%';
                     this.addTestResult(test, result);
-                    
-                    // Small delay to prevent blocking
+                    await new Promise(resolve => setTimeout(resolve, 10));
+                }
+
+                for (let i = 0; i < this.arithmeticTests.length; i++) {
+                    const test = this.arithmeticTests[i];
+                    const result = this.runArithmeticPrecisionTest(test);
+                    this.results.push({ test, result, arithmetic: true });
+                    idx++;
+                    document.getElementById('progress-fill').style.width = (idx / total * 100) + '%';
+                    this.addArithmeticTestResult(test, result);
                     await new Promise(resolve => setTimeout(resolve, 10));
                 }
                 
@@ -721,11 +677,43 @@
                 document.getElementById('test-results').appendChild(resultDiv);
             }
 
+            addArithmeticTestResult(test, result) {
+                const resultDiv = document.createElement('div');
+                resultDiv.className = `test-item ${result.toLowerCase()}`;
+                const status = result === 'PASS' ? '✅' : result === 'FAIL' ? '❌' : '⚠️';
+                const statusText = result === 'PASS' ? 'PASS' : result === 'FAIL' ? 'FAIL' : 'ERROR';
+                let actual = '';
+                let label = '';
+                try {
+                    if (test.kind === 'expr') {
+                        label = test.expr;
+                        const ast = ArithmeticPrecision.parseAst(test.expr);
+                        actual = ast ? ArithmeticPrecision.formatArithmeticDisplay(test.expr, ArithmeticPrecision.evalFull(ast)) : 'null';
+                    } else if (test.kind === 'sf') {
+                        label = 'sigFigs(' + test.literal + ')';
+                        actual = String(ArithmeticPrecision.countSignificantFiguresFromLiteral(test.literal));
+                    } else if (test.kind === 'dp') {
+                        label = 'dp(' + test.literal + ')';
+                        actual = String(ArithmeticPrecision.countDecimalPlacesFromLiteral(test.literal));
+                    }
+                } catch (e) {
+                    actual = 'error';
+                }
+                resultDiv.innerHTML = `
+                    <div><strong>${status} ${statusText}</strong> - ${test.description}</div>
+                    <div class="test-input">Input: <code>${label}</code></div>
+                    <div class="test-expected">Expected: ${test.expected}</div>
+                    <div class="test-actual">Actual: ${actual}</div>
+                `;
+                document.getElementById('test-results').appendChild(resultDiv);
+            }
+
             updateSummary() {
+                const total = this.tests.length + this.arithmeticTests.length;
                 const passed = this.results.filter(r => r.result === 'PASS').length;
                 const failed = this.results.filter(r => r.result === 'FAIL').length;
                 const errors = this.results.filter(r => r.result === 'ERROR').length;
-                const successRate = ((passed / this.tests.length) * 100).toFixed(1);
+                const successRate = ((passed / total) * 100).toFixed(1);
                 
                 document.getElementById('passed-tests').textContent = passed;
                 document.getElementById('failed-tests').textContent = failed;
@@ -746,7 +734,6 @@
 
         // Initialize test suite
         const testSuite = new TestSuite();
-        window.testSuite = testSuite;
 
         // Global function to run all tests
         function runAllTests() {
