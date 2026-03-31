@@ -18,6 +18,12 @@ function roundToPrecision(num, precision) {
 // Precision-safe arithmetic functions using decimal string manipulation
 // This completely avoids floating-point precision errors
 function preciseAdd(a, b, aPrecision, bPrecision) {
+    // IEEE754 artifacts (e.g. 0.9144000000000001) produce huge pseudo-decimal strings that break
+    // digit-wise addition. Snap to picometer-scale precision in meters before string parsing.
+    if (typeof a === 'number' && typeof b === 'number') {
+        a = Math.round(a * 1e12) / 1e12;
+        b = Math.round(b * 1e12) / 1e12;
+    }
     // Convert to strings
     var aStr = String(a);
     var bStr = String(b);
@@ -26,8 +32,8 @@ function preciseAdd(a, b, aPrecision, bPrecision) {
     var aParts = aStr.split('.');
     var bParts = bStr.split('.');
     
-    var aInt = parseInt(aParts[0], 10) || 0;
-    var bInt = parseInt(bParts[0], 10) || 0;
+    var aInt = parseInt(aParts[0]) || 0;
+    var bInt = parseInt(bParts[0]) || 0;
     
     var aDec = aParts[1] || '';
     var bDec = bParts[1] || '';
@@ -36,22 +42,15 @@ function preciseAdd(a, b, aPrecision, bPrecision) {
     var aActualLen = aPrecision !== undefined ? aPrecision : aDec.length;
     var bActualLen = bPrecision !== undefined ? bPrecision : bDec.length;
     
-    // Pad to same length for calculation
-    var maxLen = Math.max(aActualLen, bActualLen);
-    // When callers pass precision 0, we still add floating-point values that have fractional
-    // parts (e.g. meter bases from unit factors). padEnd(0) does NOT truncate long decimal
-    // strings, which made parseInt() overflow and produced garbage (e.g. 8e16 "ft").
-    if (maxLen === 0) {
-        return { value: a + b, precision: 0 };
-    }
-    aDec = (aDec + '00000000000000000000').slice(0, maxLen);
-    bDec = (bDec + '00000000000000000000').slice(0, maxLen);
+    // Pad to same length for calculation. Must include aDec/bDec length: user input may be
+    // integers (precision 0) while values are already in base units with decimals (e.g. meters).
+    var maxLen = Math.max(aActualLen, bActualLen, aDec.length, bDec.length);
     aDec = aDec.padEnd(maxLen, '0');
     bDec = bDec.padEnd(maxLen, '0');
     
     // Convert decimal parts to integers
-    var aDecInt = parseInt(aDec, 10) || 0;
-    var bDecInt = parseInt(bDec, 10) || 0;
+    var aDecInt = parseInt(aDec) || 0;
+    var bDecInt = parseInt(bDec) || 0;
     
     // Add decimals (as integers!)
     var decSum = aDecInt + bDecInt;
@@ -62,6 +61,10 @@ function preciseAdd(a, b, aPrecision, bPrecision) {
     var intSum = aInt + bInt + carry;
     
     // Build result
+    if (maxLen === 0) {
+        return { value: intSum, precision: 0 };
+    }
+    
     var decStr = String(decSum).padStart(maxLen, '0');
     var resultStr = intSum + '.' + decStr;
     
@@ -940,13 +943,37 @@ function snapNearIntegerFloat(num) {
     var r = Math.round(num);
     var diff = Math.abs(num - r);
     if (r === 0) {
-        if (diff < 1e-15) return 0;
+        var a = Math.abs(num);
+        // Only collapse IEEE noise near 0 (e.g. ±1e-16). Do not zero legitimate subnormals (h·c ≈ 2e-25, R/NA ≈ 1e-23).
+        if (a < 1e-15 && a >= 1e-18) return 0;
         return num;
     }
     if (Math.abs(r) > Number.MAX_SAFE_INTEGER) return num;
     var tol = Math.max(1e-9, Math.abs(r) * 1e-12);
     if (diff <= tol) return r;
     return num;
+}
+
+/** Temperature conversions need two decimal places (e.g. 373.15 K); formatNumber may pick one decimal (373.2). */
+function formatTemperatureResult(num) {
+    if (typeof num !== 'number' || !isFinite(num)) return String(num);
+    num = snapNearIntegerFloat(num);
+    if (Number.isInteger(num)) return String(num);
+    var s = num.toFixed(2);
+    s = s.replace(/(\.\d*?)0+$/, '$1');
+    s = s.replace(/\.$/, '');
+    return s;
+}
+
+/** Full-precision string for intermediate unit conversions (avoids formatNumber rounding 2.25 → 2.3). */
+function numberStringForConversion(num) {
+    if (typeof num !== 'number' || !isFinite(num)) return '0';
+    num = snapNearIntegerFloat(num);
+    if (Number.isInteger(num)) return String(num);
+    var s = num.toFixed(12);
+    s = s.replace(/(\.\d*?)0+$/, '$1');
+    s = s.replace(/\.$/, '');
+    return s;
 }
 
 // Helper function to format numbers and remove floating-point artifacts
@@ -957,6 +984,11 @@ function formatNumber(num) {
     num = snapNearIntegerFloat(num);
     if (Number.isInteger(num)) {
         return String(num);
+    }
+    // Avoid collapsing to "0" when rounding to 0 decimals (e.g. h·c ≈ 2e-25, R/NA ≈ 1e-23)
+    var absN = Math.abs(num);
+    if (absN > 0 && absN < 1e-14) {
+        return num.toExponential(6);
     }
 
     var maxDecimalPlaces = 15;
@@ -982,26 +1014,16 @@ function formatNumber(num) {
                 candidates.push({
                     precision: decimals,
                     rounded: rounded,
-                    trailingZeros: trailingZeros,
-                    roundError: diff
+                    trailingZeros: trailingZeros
                 });
             }
         }
     }
     
-    // Prefer candidates that round to the original value exactly (e.g. 2.25 over 2.3 for 2.25),
-    // then apply trailing-zero / precision heuristics within that pool.
-    var pool = candidates;
-    var exactPool = [];
-    for (var ei = 0; ei < candidates.length; ei++) {
-        if (candidates[ei].roundError < 1e-9) exactPool.push(candidates[ei]);
-    }
-    if (exactPool.length) pool = exactPool;
-    
     // Choose the best candidate: prefer 0 trailing zeros at lowest precision, then 1 trailing zero
-    var best = pool[0];
-    for (var i = 1; i < pool.length; i++) {
-        var c = pool[i];
+    var best = candidates[0];
+    for (var i = 1; i < candidates.length; i++) {
+        var c = candidates[i];
         if (c.trailingZeros === 0 && best.trailingZeros !== 0) {
             // Always prefer 0 trailing zeros
             best = c;
@@ -1095,6 +1117,40 @@ function unitsJsCalc(input) {
     
     // Handle empty input
     if (!input) return null;
+
+    // BEFORE generic "expr in unit": parenthesized value (e.g. "(2 * (3 ft + 6 in)) in m").
+    // Generic inToMatch normalizes "(2*(3ft+6in))" and breaks inner "+" — must run here first.
+    var parenUnitEarly = input.match(/^\((.*)\)\s+in\s+([a-zA-Z\-²³]+)$/i);
+    if (parenUnitEarly) {
+        var innerExprEarly = parenUnitEarly[1];
+        var targetUnitEarly = parenUnitEarly[2];
+        var complexMatchEarly = innerExprEarly.match(/^(\d+)\s*\*\s*\(([^)]+)\)$/);
+        if (complexMatchEarly) {
+            var multEarly = parseFloat(complexMatchEarly[1]);
+            var innerUnitExprEarly = complexMatchEarly[2];
+            var innerResultEarly = processMixedUnits(innerUnitExprEarly);
+            if (innerResultEarly) {
+                var numMatchEarly = innerResultEarly.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
+                if (numMatchEarly) {
+                    var numValEarly = parseFloat(numMatchEarly[1]);
+                    var baseUnitEarly = numMatchEarly[2];
+                    var totalValEarly = numValEarly * multEarly;
+                    var resultEarly = processInConversion(numberStringForConversion(totalValEarly) + ' ' + baseUnitEarly, targetUnitEarly);
+                    if (resultEarly) return resultEarly;
+                }
+            }
+        }
+        var innerResultOnly = processMixedUnits(innerExprEarly);
+        if (innerResultOnly) {
+            var numMatchOnly = innerResultOnly.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
+            if (numMatchOnly) {
+                var numOnly = numMatchOnly[1];
+                var baseU = numMatchOnly[2];
+                var resultOnly = processInConversion(numOnly + ' ' + baseU, targetUnitEarly);
+                if (resultOnly) return resultOnly;
+            }
+        }
+    }
 
     // PRIORITY: Check for "in" or "to" conversions with mixed units FIRST (e.g., "3ft+5in in inches")
     // This must come before general mixed unit processing so we can convert to the requested unit
@@ -1234,8 +1290,7 @@ function unitsJsCalc(input) {
         var value = tempMatch[1]; var fromUnit = tempMatch[2]; var toUnit = tempMatch[3];
         var result = convertTemperature(parseFloat(value), fromUnit.toUpperCase(), toUnit.toUpperCase());
         if (result !== null) {
-            // Use formatNumber for mathematically correct formatting
-            return formatNumber(result)+" "+toUnit.toUpperCase();
+            return formatTemperatureResult(result)+" "+toUnit.toUpperCase();
         }
     }
     
@@ -1268,8 +1323,7 @@ function unitsJsCalc(input) {
         if (fromUnit && toUnit) {
             var result = convertTemperature(parseFloat(value), fromUnit, toUnit);
             if (result !== null) {
-                // Use formatNumber for mathematically correct formatting
-                return formatNumber(result)+" "+toUnit;
+                return formatTemperatureResult(result)+" "+toUnit;
             }
         }
     }
@@ -1280,8 +1334,7 @@ function unitsJsCalc(input) {
         var value = tempInShortMatch[1]; var fromUnit = tempInShortMatch[2]; var toUnit = tempInShortMatch[3];
         var result = convertTemperature(parseFloat(value), fromUnit.toUpperCase(), toUnit.toUpperCase());
         if (result !== null) {
-            // Use formatNumber for mathematically correct formatting
-            return formatNumber(result)+" "+toUnit.toUpperCase();
+            return formatTemperatureResult(result)+" "+toUnit.toUpperCase();
         }
     }
     
@@ -1409,67 +1462,7 @@ function unitsJsCalc(input) {
         }
     }
     
-    // Check for parentheses in unit expressions (e.g., "(5km - 300m) in km", "(2 * (3 ft + 6 in)) in m")
-    // Improved: allow nested parentheses by using a greedy capture and balancing later if needed
-    var parenUnitMatch = input.match(/^\((.*)\)\s+in\s+([a-zA-Z\-²³]+)$/i);
-    if (parenUnitMatch) {
-        var innerExpr = parenUnitMatch[1];
-        var targetUnit = parenUnitMatch[2];
-        
-        // Handle complex expressions like (2 * (3 ft + 6 in))
-        var complexMatch = innerExpr.match(/^(\d+)\s*\*\s*\(([^)]+)\)$/);
-        if (complexMatch) {
-            var multiplier = parseFloat(complexMatch[1]);
-            var innerUnitExpr = complexMatch[2];
-            var innerResult = processMixedUnits(innerUnitExpr);
-            if (innerResult) {
-                var numMatch = innerResult.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
-                if (numMatch) {
-                    var numValue = parseFloat(numMatch[1]);
-                    var baseUnit = numMatch[2];
-                    var totalValue = numValue * multiplier;
-                    var result = processInConversion(totalValue + ' ' + baseUnit, targetUnit);
-                    if (result) {
-                        return result;
-                    }
-                }
-            }
-        }
-        
-        // Handle expressions like (2 * (3 ft + 6 in)) - improved pattern matching
-        var complexMultMatch = innerExpr.match(/^(\d+)\s*\*\s*\(([^)]+)\)$/);
-        if (complexMultMatch) {
-            var mult = parseFloat(complexMultMatch[1]);
-            var innerExpr2 = complexMultMatch[2];
-            var innerResult2 = processMixedUnits(innerExpr2);
-            if (innerResult2) {
-                var numMatch2 = innerResult2.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
-                if (numMatch2) {
-                    var numVal = parseFloat(numMatch2[1]);
-                    var baseUnit2 = numMatch2[2];
-                    var totalVal = numVal * mult;
-                    var result2 = processInConversion(totalVal + ' ' + baseUnit2, targetUnit);
-                    if (result2) {
-                        return result2;
-                    }
-                }
-            }
-        }
-        
-        // Handle simple expressions like (5km - 300m)
-        var innerResult = processMixedUnits(innerExpr);
-        if (innerResult) {
-            var numMatch = innerResult.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
-            if (numMatch) {
-                var numValue = numMatch[1];
-                var baseUnit = numMatch[2];
-                var result = processInConversion(numValue + ' ' + baseUnit, targetUnit);
-                if (result) {
-                    return result;
-                }
-            }
-        }
-    }
+    // (Parenthesized "expr in unit" handled at top of unitsJsCalc.)
     
     // Check for complex nested parentheses (e.g., "((2 + 3) * 4) in hex")
     var nestedParenMatch = input.match(/^\(+([^)]+)\)+\s+in\s+([a-zA-Z\-²³]+)$/i);
@@ -2043,7 +2036,7 @@ function processMixedUnits(input) {
                 var firstUnitBaseValue = convertToBaseUnit(1, firstUnit);
                 if (firstUnitBaseValue && firstUnitBaseValue.unit === firstBaseValue.unit) {
                     var resultInFirstUnit = totalBaseValue / firstUnitBaseValue.value;
-                    formattedNum = String(formatNumber(resultInFirstUnit));
+                    formattedNum = numberStringForConversion(resultInFirstUnit);
                     unitToUse = firstUnit.trim();
                 } else {
                     // Fallback: return in base unit if conversion fails
@@ -2228,11 +2221,9 @@ function processMixedUnits(input) {
     }
     
     if (resultUnit) {
-        // Round the result to eliminate floating-point noise before converting back to the user's
-        // first unit. Do not use displayPrecision alone: integer inputs (e.g. "3 ft") set it to 0,
-        // which would round 1.0668 m to 1 m and break expressions like "3 ft + 6 in".
-        var internalPrec = Math.min(Math.max(displayPrecision, 8), 14);
-        var cleanedResult = roundToPrecision(result, internalPrec);
+        // Round the result to eliminate floating-point noise. Use resultPrecision from arithmetic
+        // (e.g. adding base-unit floats) even when operands looked like integers (displayPrecision 0).
+        var cleanedResult = roundToPrecision(result, Math.min(Math.max(displayPrecision, resultPrecision), 10));
         
         // Convert back to the first unit used (preferred by user)
         var formattedNum;
@@ -2242,7 +2233,7 @@ function processMixedUnits(input) {
             var firstUnitBaseValue = convertToBaseUnit(1, firstOriginalUnit);
             if (firstUnitBaseValue && firstUnitBaseValue.unit === resultUnit) {
                 var resultInFirstUnit = cleanedResult / firstUnitBaseValue.value;
-                formattedNum = String(formatNumber(resultInFirstUnit));
+                formattedNum = numberStringForConversion(resultInFirstUnit);
                 unitToUse = firstOriginalUnit.trim();
             } else {
                 // Fallback: use base unit

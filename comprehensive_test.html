@@ -16,6 +16,9 @@
         .summary { background-color: #e3f2fd; padding: 15px; border-radius: 5px; margin: 20px 0; }
         .run-all-btn { background-color: #2196F3; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; }
         .run-all-btn:hover { background-color: #1976D2; }
+        .sort-bar { margin-top: 16px; padding-top: 12px; border-top: 1px solid #90caf9; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .sort-bar label { font-weight: bold; color: #1565c0; }
+        .sort-bar select { padding: 8px 12px; font-size: 14px; border-radius: 4px; border: 1px solid #90caf9; background: #fff; min-width: 220px; cursor: pointer; }
         .progress { margin: 10px 0; }
         .progress-bar { width: 100%; height: 20px; background-color: #f0f0f0; border-radius: 10px; overflow: hidden; }
         .progress-fill { height: 100%; background-color: #4CAF50; transition: width 0.3s ease; }
@@ -39,6 +42,14 @@
         </div>
         
         <button class="run-all-btn" onclick="runAllTests()">Run All Tests</button>
+        <div class="sort-bar">
+            <label for="test-sort-order">Sort results:</label>
+            <select id="test-sort-order" title="Reorder test rows">
+                <option value="run">Run order (as executed)</option>
+                <option value="fail-first" selected>Failures &amp; errors first</option>
+                <option value="pass-first">Passed first</option>
+            </select>
+        </div>
     </div>
 
     <div id="test-results"></div>
@@ -53,6 +64,7 @@
                 this.arithmeticTests = [];
                 this.results = [];
                 this.currentTestIndex = 0;
+                this._resultRunIndex = 0;
                 this.setupTests();
                 this.setupArithmeticPrecisionTests();
             }
@@ -631,6 +643,7 @@
             async runAllTests() {
                 this.results = [];
                 this.currentTestIndex = 0;
+                this._resultRunIndex = 0;
                 
                 const total = this.tests.length + this.arithmeticTests.length;
                 document.getElementById('total-tests').textContent = total;
@@ -658,11 +671,13 @@
                 }
                 
                 this.updateSummary();
+                applyTestSort(document.getElementById('test-sort-order').value);
             }
 
             addTestResult(test, result) {
                 const resultDiv = document.createElement('div');
                 resultDiv.className = `test-item ${result.toLowerCase()}`;
+                resultDiv.dataset.runIndex = String(this._resultRunIndex++);
                 
                 const status = result === 'PASS' ? '✅' : result === 'FAIL' ? '❌' : '⚠️';
                 const statusText = result === 'PASS' ? 'PASS' : result === 'FAIL' ? 'FAIL' : 'ERROR';
@@ -680,6 +695,7 @@
             addArithmeticTestResult(test, result) {
                 const resultDiv = document.createElement('div');
                 resultDiv.className = `test-item ${result.toLowerCase()}`;
+                resultDiv.dataset.runIndex = String(this._resultRunIndex++);
                 const status = result === 'PASS' ? '✅' : result === 'FAIL' ? '❌' : '⚠️';
                 const statusText = result === 'PASS' ? 'PASS' : result === 'FAIL' ? 'FAIL' : 'ERROR';
                 let actual = '';
@@ -734,6 +750,43 @@
 
         // Initialize test suite
         const testSuite = new TestSuite();
+
+        /** Reorder #test-results rows: fail (0), error (1), pass (2), or original run index. */
+        function applyTestSort(mode) {
+            const container = document.getElementById('test-results');
+            if (!container) return;
+            const items = Array.from(container.querySelectorAll('.test-item'));
+            if (items.length === 0) return;
+
+            function statusRank(el) {
+                if (el.classList.contains('fail')) return 0;
+                if (el.classList.contains('error')) return 1;
+                if (el.classList.contains('pass')) return 2;
+                return 3;
+            }
+
+            if (mode === 'run') {
+                items.sort((a, b) => Number(a.dataset.runIndex || 0) - Number(b.dataset.runIndex || 0));
+            } else if (mode === 'fail-first') {
+                items.sort((a, b) => {
+                    const dr = statusRank(a) - statusRank(b);
+                    if (dr !== 0) return dr;
+                    return Number(a.dataset.runIndex || 0) - Number(b.dataset.runIndex || 0);
+                });
+            } else if (mode === 'pass-first') {
+                items.sort((a, b) => {
+                    const dr = statusRank(b) - statusRank(a);
+                    if (dr !== 0) return dr;
+                    return Number(a.dataset.runIndex || 0) - Number(b.dataset.runIndex || 0);
+                });
+            }
+
+            items.forEach((el) => container.appendChild(el));
+        }
+
+        document.getElementById('test-sort-order').addEventListener('change', function () {
+            applyTestSort(this.value);
+        });
 
         // Global function to run all tests
         function runAllTests() {
