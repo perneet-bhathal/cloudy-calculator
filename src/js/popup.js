@@ -687,7 +687,8 @@ class CloudyCalculator {
         // Handle trailing operators by removing them
         // This allows expressions like "8+8+" to be treated as "8+8"
         // Also handles multiple trailing operators like "8+8++" or "5*3--"
-        expr = expr.replace(/[+\-*/^]+$/, '');
+        // Strip trailing "=" (calculator-style input like "10000*50=")
+        expr = expr.replace(/[+\-*/^=]+$/, '');
         
         let pos = 0;
 
@@ -763,17 +764,20 @@ class CloudyCalculator {
                 funcName += consume();
             }
             
-            if (peek() !== '(') {
+            let arg;
+            if (peek() === '(') {
+                consume(); // consume '('
+                arg = parseExpression();
+                if (peek() !== ')') {
+                    throw new Error('Expected )');
+                }
+                consume(); // consume ')'
+            } else if (/[0-9.]/.test(peek())) {
+                // Implicit argument: cos60, sin60, log2, ln2, sqrt4
+                arg = parseNumber();
+            } else {
                 throw new Error('Expected ( after function name');
             }
-            consume(); // consume '('
-            
-            const arg = parseExpression();
-            
-            if (peek() !== ')') {
-                throw new Error('Expected )');
-            }
-            consume(); // consume ')'
             
             switch (funcName.toLowerCase()) {
                 // Keep calculator behavior intuitive: trig functions use degrees by default.
@@ -1300,6 +1304,14 @@ class CloudyCalculator {
 
     // Check if input looks like a unit conversion query
     looksLikeUnitQuery(input) {
+        // Currency compact forms with optional spaces, including symbols (e.g. "46000 rub to$", "100$ in eur")
+        if (/\d+(?:\.\d+)?\s*([a-zA-Z$€£¥₽]{1,}|[A-Z]{3})\s*(?:to|in)\s*([a-zA-Z$€£¥₽]{1,}|[A-Z]{3})/i.test(input)) {
+            return true;
+        }
+        // Glued number+unit then "to"/"in" (e.g. "1800sqm to sqf") — must come before generic patterns
+        if (/\d+(?:\.\d+)?[a-zA-Z\-²³\/]+\s+(?:to|in)\s+/i.test(input)) {
+            return true;
+        }
         // Check for common unit patterns
         const unitPatterns = [
             // Mixed units with + or - and "in" conversions (highest priority)
@@ -1308,11 +1320,11 @@ class CloudyCalculator {
             /\d+\s*[a-zA-Z\-]+\s*[+\-]\s*\d+\s*[a-zA-Z\-]+/,
             // "in" conversions
             /\d+(?:\/\d+)?\s*[a-zA-Z\-]+\s+in\s+[a-zA-Z\-]+/,
+            // "to" / "in" conversions: from-unit is word(s), not greedy [a-zA-Z\s]+ (that swallows "to" in "sqm to sqf")
+            /\d+(?:\.\d+)?\s+[a-zA-Z\-²³]+(?:\s+[a-zA-Z\-²³]+)*\s+(?:to|in)\s+[a-zA-Z0-9\-²³\/\s]+/i,
             // "to" conversions (temperature, currency)
             /\d+(?:\.\d+)?\s*[CFKR]\s+to\s+[CFKR]/i,
             /\d+(?:\.\d+)?\s+[A-Z]{3}\s+to\s+[A-Z]{3}/i,
-            // Currency conversions with names (e.g., "1 euro to usd", "1 euro in usd")
-            /\d+(?:\.\d+)?\s+[a-zA-Z\s]+\s+(?:to|in)\s+[a-zA-Z\s]+/i,
             // Number base conversions
             /.+\s+in\s+(hex|octal|binary|decimal)/i,
             // Mathematical functions

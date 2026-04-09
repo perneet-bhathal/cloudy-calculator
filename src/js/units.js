@@ -697,21 +697,54 @@ var CURRENCIES = {
     CHF: 0.92,
     CNY: 6.45,
     // Rates are expressed as: 1 USD = X currency units.
-    MXN: 17.0
+    MXN: 17.0,
+    RUB: 90.0
 };
 
 // Currency name to code mapping
 var CURRENCY_NAMES = {
-    'usd': 'USD', 'dollar': 'USD', 'dollars': 'USD', 'us dollar': 'USD',
+    'usd': 'USD', 'dollar': 'USD', 'dollars': 'USD', 'us dollar': 'USD', '$': 'USD', 'us$': 'USD',
     'eur': 'EUR', 'euro': 'EUR', 'euros': 'EUR',
     'gbp': 'GBP', 'pound': 'GBP', 'pounds': 'GBP', 'british pound': 'GBP', 'sterling': 'GBP',
-    'jpy': 'JPY', 'yen': 'JPY', 'japanese yen': 'JPY',
+    'jpy': 'JPY', 'yen': 'JPY', 'japanese yen': 'JPY', '¥': 'JPY',
     'cad': 'CAD', 'canadian dollar': 'CAD', 'canadian dollars': 'CAD',
     'aud': 'AUD', 'australian dollar': 'AUD', 'australian dollars': 'AUD',
     'chf': 'CHF', 'swiss franc': 'CHF', 'franc': 'CHF', 'francs': 'CHF',
     'cny': 'CNY', 'yuan': 'CNY', 'chinese yuan': 'CNY', 'renminbi': 'CNY', 'rmb': 'CNY',
-    'mxn': 'MXN', 'peso': 'MXN', 'pesos': 'MXN', 'mexican peso': 'MXN'
+    'mxn': 'MXN', 'peso': 'MXN', 'pesos': 'MXN', 'mexican peso': 'MXN',
+    'rub': 'RUB', 'ruble': 'RUB', 'rubles': 'RUB', 'rouble': 'RUB', 'roubles': 'RUB', 'russian ruble': 'RUB', '₽': 'RUB',
+    '€': 'EUR', '£': 'GBP'
 };
+// Symbol lookup derived from available currency codes (prefer API-loaded codes).
+// Example: "₹" -> ["INR"], "$" -> ["USD","CAD",...]
+var CURRENCY_SYMBOL_TO_CODES = {};
+
+function rebuildCurrencySymbolLookup() {
+    CURRENCY_SYMBOL_TO_CODES = {};
+    // Build reverse map using Intl symbols for all known codes in CURRENCIES.
+    for (var code in CURRENCIES) {
+        if (!CURRENCIES.hasOwnProperty(code)) continue;
+        try {
+            var parts = new Intl.NumberFormat('en', {
+                style: 'currency',
+                currency: code,
+                currencyDisplay: 'narrowSymbol'
+            }).formatToParts(1);
+            for (var i = 0; i < parts.length; i++) {
+                var p = parts[i];
+                if (p.type !== 'currency') continue;
+                var sym = (p.value || '').trim();
+                if (!sym) continue;
+                if (!CURRENCY_SYMBOL_TO_CODES[sym]) CURRENCY_SYMBOL_TO_CODES[sym] = [];
+                if (CURRENCY_SYMBOL_TO_CODES[sym].indexOf(code) === -1) {
+                    CURRENCY_SYMBOL_TO_CODES[sym].push(code);
+                }
+            }
+        } catch (e) {
+            // Ignore unsupported currency codes in Intl.
+        }
+    }
+}
 
 // Helper function to normalize currency name/code to 3-letter code
 function normalizeCurrency(currency) {
@@ -724,6 +757,11 @@ function normalizeCurrency(currency) {
     // Check currency name mapping
     if (CURRENCY_NAMES[normalized]) {
         return CURRENCY_NAMES[normalized];
+    }
+    // Dynamic symbol lookup (derived from API-backed CURRENCIES codes).
+    var symbolCodes = CURRENCY_SYMBOL_TO_CODES[currency.trim()];
+    if (symbolCodes && symbolCodes.length === 1) {
+        return symbolCodes[0];
     }
     return null;
 }
@@ -748,6 +786,7 @@ async function fetchCurrencyRates() {
             for (var currency in data.rates) {
                 rates[currency] = data.rates[currency];
             }
+            rebuildCurrencySymbolLookup();
         }
         
         return rates;
@@ -775,6 +814,7 @@ async function loadCurrencyRates() {
                             for (var currency in newRates) {
                                 CURRENCIES[currency] = newRates[currency];
                             }
+                            rebuildCurrencySymbolLookup();
                             // Save to storage
                             chrome.storage.local.set({
                                 currencyRates: newRates,
@@ -787,6 +827,7 @@ async function loadCurrencyRates() {
                                 for (var currency in rates) {
                                     CURRENCIES[currency] = rates[currency];
                                 }
+                                rebuildCurrencySymbolLookup();
                             }
                             resolve(rates || CURRENCIES);
                         }
@@ -797,6 +838,7 @@ async function loadCurrencyRates() {
                         for (var currency in rates) {
                             CURRENCIES[currency] = rates[currency];
                         }
+                        rebuildCurrencySymbolLookup();
                     }
                     resolve(rates || CURRENCIES);
                 }
@@ -810,6 +852,7 @@ async function loadCurrencyRates() {
 
 // Initialize currency rates on load
 if (typeof window !== 'undefined') {
+    rebuildCurrencySymbolLookup();
     // Load rates when units.js is loaded
     loadCurrencyRates();
 }
@@ -1114,6 +1157,8 @@ var MATH_FUNCTIONS = {
 // Main units calculation function
 function unitsJsCalc(input) {
     input = input.trim();
+    // Allow calculator-style suffix "=" in expressions (e.g. "1800 sqm to sqf =")
+    input = input.replace(/\s*=\s*$/, '');
     
     // Handle empty input
     if (!input) return null;
@@ -1340,7 +1385,7 @@ function unitsJsCalc(input) {
     
     // Check for currency conversions (e.g., "100 USD to EUR", "1 euro in usd", "1 euro to usd")
     // Allow trailing equals sign or other characters
-    var currencyMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\s]+)\s+(?:to|in)\s+([a-zA-Z\s]+)(?:\s*=|$)/i);
+    var currencyMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z$€£¥₽\s]+)\s*(?:to|in)\s*([a-zA-Z$€£¥₽\s]+)(?:\s*=|$)/i);
     if (currencyMatch) {
         var value = currencyMatch[1];
         var fromCurrStr = currencyMatch[2].trim();
@@ -2430,12 +2475,18 @@ var UNIT_ALIASES = {
     'micrometres':'micrometre', 'micrometers':'micrometer',
     // Area unit aliases
     'sqm':'sq-m', 'sq m':'sq-m',
-    'sqft':'sq-ft', 'sq ft':'sq-ft',
-    'sqkm':'sq-km', 'sq km':'sq-km',
-    'sqcm':'sq-cm', 'sq cm':'sq-cm',
-    'sqmi':'sq-mi', 'sq mi':'sq-mi',
-    'sqyd':'sq-yd', 'sq yd':'sq-yd',
-    'sqin':'sq-in', 'sq in':'sq-in'
+    'sqmeter':'sq-m', 'sqmeters':'sq-m', 'sq-meter':'sq-m', 'sq-meters':'sq-m',
+    'sqmetre':'sq-m', 'sqmetres':'sq-m', 'sq-metre':'sq-m', 'sq-metres':'sq-m',
+    'squaremeter':'sq-m', 'squaremeters':'sq-m', 'square meter':'sq-m', 'square meters':'sq-m',
+    'squaremetre':'sq-m', 'squaremetres':'sq-m', 'square metre':'sq-m', 'square metres':'sq-m',
+    'sqft':'sq-ft', 'sq ft':'sq-ft', 'sqf':'sq-ft',
+    'sqfeet':'sq-ft', 'sq-feet':'sq-ft', 'sq feet':'sq-ft',
+    'squarefoot':'sq-ft', 'squarefeet':'sq-ft', 'square-foot':'sq-ft', 'square-feet':'sq-ft',
+    'sqkm':'sq-km', 'sq km':'sq-km', 'squarekm':'sq-km', 'square km':'sq-km',
+    'sqcm':'sq-cm', 'sq cm':'sq-cm', 'squarecm':'sq-cm', 'square cm':'sq-cm',
+    'sqmi':'sq-mi', 'sq mi':'sq-mi', 'squaremi':'sq-mi', 'square mi':'sq-mi',
+    'sqyd':'sq-yd', 'sq yd':'sq-yd', 'squareyd':'sq-yd', 'square yd':'sq-yd',
+    'sqin':'sq-in', 'sq in':'sq-in', 'squarein':'sq-in', 'square in':'sq-in'
 };
 function normalizeUnitToken(u){ 
     if(!u) return u; 
