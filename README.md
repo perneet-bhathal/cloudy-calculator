@@ -32,6 +32,12 @@ and bug fixes for mixed-unit arithmetic.
 
 ---
 
+## Documentation
+
+- **[Calculator display precision](src/calculator-display-precision.md)** — how pure arithmetic and related UI rounding work (`src/js/arithmeticPrecision.js`, `src/js/popup.js`). Cursor rules under `src/.cursor/rules/` point to this file.
+
+---
+
 ## Testing
 
 This version has been run against the **full 395-case comprehensive test suite**  

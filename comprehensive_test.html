@@ -197,6 +197,10 @@
                 this.addTest("5 mi in km", "≈8.04672", "98. 5 mi in km (lower/upper mix doesn't matter) → ≈8.04672");
                 this.addTest(" 2   km   in   m ", "2000", "99.  2   km   in   m  (extra spaces) → 2000");
                 this.addTest("0x10+0x10 in decimal", "32", "100. 0x10+0x10 in decimal → 32");
+                this.addTest("1800sqm to sqf =", "≈19375.04", "101. 1800sqm to sqf = → ≈19375.04");
+                this.addTest("1800 sqm to sqf =", "≈19375.04", "102. 1800 sqm to sqf = → ≈19375.04");
+                this.addTest("1800 sqm to sq feet =", "≈19375.04", "103. 1800 sqm to sq feet = → ≈19375.04");
+                this.addTest("46000 rub to$ =", "numeric", "104. 46000 rub to$ = → numeric");
 
                 // Error handling tests
                 this.addTest("5 m + 3 s", "❌", "101. 5 m + 3 s → ❌ \"dimensions are incompatible\"");
@@ -522,6 +526,16 @@
                 T('expr', { expr: '100/4' }, '25', 'AP404. integer-like result');
                 T('expr', { expr: '2^3' }, '8', 'AP405. power uses min sig figs of base and exponent');
 
+                // User-reported regression: integer×decimal must not collapse to wrong magnitude; int/int division must show decimals
+                T('expr', { expr: '1031/9734' }, '≈0.1059', 'AP411. long division → reasonable decimal (not over-rounded)');
+                T('expr', { expr: '52/8' }, '6.5', 'AP412. integer / integer → fractional when not exact');
+                T('expr', { expr: '70*1.44' }, '100.8', 'AP413. integer × decimal → full decimal scale (not 100)');
+                T('expr', { expr: '80*1.44' }, '115.2', 'AP414. 80*1.44 → 115.2');
+                T('expr', { expr: '90*1.44' }, '129.6', 'AP415. 90*1.44 → 129.6');
+                T('expr', { expr: '50*1.44' }, '72', 'AP416. 50*1.44 → 72');
+                T('expr', { expr: '60*1.44' }, '86.4', 'AP417. 60*1.44 → 86.4');
+                T('expr', { expr: '100*1.44' }, '144', 'AP418. 100*1.44 → 144');
+
                 T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
                 T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
                 T('sf', { literal: '1020' }, 3, 'AP408. countSigFigs: integer strips ambiguous trailing zeros');
@@ -553,10 +567,15 @@
                         const raw = ArithmeticPrecision.evalFull(ast);
                         const disp = ArithmeticPrecision.formatArithmeticDisplay(test.expr, raw);
                         if (disp === test.expected) return 'PASS';
-                        const exp = parseFloat(test.expected);
+                        let expectedStr = test.expected;
+                        if (expectedStr.startsWith('≈')) expectedStr = expectedStr.substring(1);
+                        const exp = parseFloat(expectedStr);
                         const act = parseFloat(disp);
-                        if (!isNaN(exp) && !isNaN(act) && Math.abs(exp - act) <= Math.max(1e-9, Math.abs(exp) * 1e-6)) {
-                            return 'PASS';
+                        if (!isNaN(exp) && !isNaN(act)) {
+                            const tol = test.expected.startsWith('≈')
+                                ? Math.max(1e-9, Math.abs(exp) * 0.01)
+                                : Math.max(1e-9, Math.abs(exp) * 1e-6);
+                            if (Math.abs(exp - act) <= tol) return 'PASS';
                         }
                         return 'FAIL';
                     }

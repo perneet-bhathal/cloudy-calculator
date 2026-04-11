@@ -289,6 +289,44 @@
         return Math.min(effectiveDpForAddOperand(ast.left), effectiveDpForAddOperand(ast.right));
     }
 
+    /** Max decimal places among literal leaves (for display width). */
+    function maxLeafDp(ast) {
+        if (!ast) return 0;
+        switch (ast.kind) {
+            case 'lit':
+                return ast.dp;
+            case 'neg':
+                return maxLeafDp(ast.child);
+            case 'add':
+            case 'sub':
+            case 'mul':
+            case 'div':
+            case 'pow':
+                return Math.max(maxLeafDp(ast.left), maxLeafDp(ast.right));
+            default:
+                return 0;
+        }
+    }
+
+    /** True if every literal leaf has a decimal point (dp > 0). */
+    function allLeafLiteralsHavePositiveDp(ast) {
+        if (!ast) return true;
+        switch (ast.kind) {
+            case 'lit':
+                return ast.dp > 0;
+            case 'neg':
+                return allLeafLiteralsHavePositiveDp(ast.child);
+            case 'add':
+            case 'sub':
+            case 'mul':
+            case 'div':
+            case 'pow':
+                return allLeafLiteralsHavePositiveDp(ast.left) && allLeafLiteralsHavePositiveDp(ast.right);
+            default:
+                return false;
+        }
+    }
+
     function inferDisplayFormatSpec(expr) {
         const ast = parseAst(expr);
         if (!ast) return null;
@@ -299,6 +337,29 @@
             }
             if (ast.kind === 'lit') {
                 return { type: 'sigFigs', n: Math.min(15, Math.max(1, ast.sig)) };
+            }
+            // Division: integer/integer literals → enough decimals to show the real quotient;
+            // all-decimal operands → min sig figs (scientific-style); mixed → max leaf dp.
+            if (ast.kind === 'div') {
+                if (allLeafLiteralsHavePositiveDp(ast)) {
+                    const sig = inferSig(ast);
+                    return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
+                }
+                if (ast.left.kind === 'lit' && ast.right.kind === 'lit' && ast.left.dp === 0 && ast.right.dp === 0) {
+                    return { type: 'decimalPlaces', n: 15 };
+                }
+                const md = maxLeafDp(ast);
+                return { type: 'decimalPlaces', n: Math.min(15, Math.max(md, 1)) };
+            }
+            // Multiplication: if every leaf is a “decimal literal”, keep min sig figs; if any integer
+            // literal appears (e.g. 70*1.44), use max decimal width so results don’t collapse to 100.
+            if (ast.kind === 'mul') {
+                if (allLeafLiteralsHavePositiveDp(ast)) {
+                    const sig = inferSig(ast);
+                    return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
+                }
+                const md = maxLeafDp(ast);
+                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, md)) };
             }
             const sig = inferSig(ast);
             return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
@@ -318,7 +379,13 @@
             }
             let v = roundToDecimalPlaces(rawValue, spec.n);
             v = snapNearIntegerFloat(v);
-            return v.toFixed(spec.n);
+            if (Number.isInteger(v) && Math.abs(v - rawValue) <= 1e-9 * Math.max(1, Math.abs(rawValue))) {
+                return String(v);
+            }
+            let s = v.toFixed(spec.n);
+            s = s.replace(/(\.\d*?)0+$/, '$1');
+            s = s.replace(/\.$/, '');
+            return s;
         }
 
         let v = snapNearIntegerFloat(rawValue);
