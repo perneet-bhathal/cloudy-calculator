@@ -185,6 +185,34 @@ class CloudyCalculator {
             }
         }
     }
+
+    /**
+     * Parse a calculator/units result into a number. parseFloat treats 0b/0o/0x literals wrong (e.g. 0).
+     */
+    parseNumericFromResult(val) {
+        if (typeof val === 'number') {
+            return isFinite(val) ? val : NaN;
+        }
+        if (typeof val !== 'string') {
+            return NaN;
+        }
+        const t = val.trim();
+        if (/^0b[01]+$/i.test(t)) {
+            return parseInt(t.slice(2), 2);
+        }
+        if (/^0o[0-7]+$/i.test(t)) {
+            return parseInt(t.slice(2), 8);
+        }
+        if (/^0x[0-9a-f]+$/i.test(t)) {
+            return parseInt(t.slice(2), 16);
+        }
+        return parseFloat(t);
+    }
+
+    isValidLastResult(val) {
+        const n = this.parseNumericFromResult(val);
+        return typeof n === 'number' && isFinite(n);
+    }
     
     /**
      * Resets the @ variable to 0
@@ -492,7 +520,10 @@ class CloudyCalculator {
                 const unitsResult = unitsJsCalc(inputForUnits);
                 if (unitsResult) {
                     this.addResult(input, unitsResult, 'units');
-                    this.variables['@'] = unitsResult;
+                    const n = this.parseNumericFromResult(unitsResult);
+                    this.variables['@'] = (typeof n === 'number' && isFinite(n))
+                        ? snapNearIntegerFloat(n)
+                        : 0;
                     this.saveState();
                     this.calcInput.value = '';
                     this.focusInput();
@@ -536,8 +567,7 @@ class CloudyCalculator {
             this.addResult(input, errorMessage, 'error');
             
             // Don't update @ variable on error - keep the last valid result
-            // But ensure @ is still a valid number
-            if (typeof this.variables['@'] !== 'number' || !isFinite(this.variables['@'])) {
+            if (!this.isValidLastResult(this.variables['@'])) {
                 this.variables['@'] = 0;
             }
             
@@ -559,9 +589,10 @@ class CloudyCalculator {
                 const unitsResult = unitsJsCalc(expression);
                 if (unitsResult) {
                     this.variables[varName] = unitsResult;
-                    // Ensure @ is set to a valid number
-                    const numValue = parseFloat(unitsResult);
-                    this.variables['@'] = isNaN(numValue) ? 0 : numValue;
+                    const numValue = this.parseNumericFromResult(unitsResult);
+                    this.variables['@'] = (typeof numValue === 'number' && isFinite(numValue))
+                        ? snapNearIntegerFloat(numValue)
+                        : 0;
                     this.addResult(input, `${varName} = ${unitsResult}`, 'units');
                     return true;
                 }
@@ -662,7 +693,7 @@ class CloudyCalculator {
 
         // Substitute the special '@' variable first (word boundaries don't match '@')
         const atRaw = this.variables['@'];
-        const atNum = parseFloat(atRaw);
+        const atNum = this.parseNumericFromResult(atRaw);
         const atReplacement = (typeof atNum === 'number' && isFinite(atNum)) ? atNum.toString() : '0';
         expr = expr.replace(/@/g, atReplacement);
 
@@ -895,30 +926,17 @@ class CloudyCalculator {
 
         const maxDecimalPlaces = 15;
 
-        if (formatSpec && formatSpec.type === 'decimalPlaces' && typeof ArithmeticPrecision !== 'undefined') {
-            const dp = Math.min(maxDecimalPlaces, Math.max(0, formatSpec.n));
-            if (dp === 0) {
-                const z = snapNearIntegerFloat(num);
-                return String(Math.round(z));
+        if (
+            formatSpec &&
+            typeof ArithmeticPrecision !== 'undefined' &&
+            typeof ArithmeticPrecision.formatWithSpec === 'function'
+        ) {
+            const normalizedSpec = Object.assign({}, formatSpec);
+            if (normalizedSpec.type === 'decimalPlaces') {
+                normalizedSpec.n = Math.min(maxDecimalPlaces, Math.max(0, normalizedSpec.n));
             }
-            let v = ArithmeticPrecision.roundToDecimalPlaces(num, dp);
-            v = snapNearIntegerFloat(v);
-            return v.toFixed(dp);
-        }
-
-        if (formatSpec && formatSpec.type === 'sigFigs' && typeof ArithmeticPrecision !== 'undefined') {
-            let v = snapNearIntegerFloat(num);
-            if (Number.isInteger(v)) {
-                return String(v);
-            }
-            v = ArithmeticPrecision.roundToSignificantFigures(num, formatSpec.n);
-            v = snapNearIntegerFloat(v);
-            if (Number.isInteger(v)) return String(v);
-            let s = v.toPrecision(formatSpec.n);
-            if (!/e/i.test(s)) {
-                s = String(parseFloat(s));
-            }
-            return s;
+            const formattedByRule = ArithmeticPrecision.formatWithSpec(num, normalizedSpec);
+            if (formattedByRule !== null) return formattedByRule;
         }
 
         num = snapNearIntegerFloat(num);
@@ -1046,10 +1064,15 @@ class CloudyCalculator {
                     displayResult = result; // Keep original format
                 }
             } else {
-                // No unit - try to parse and format as before
-                const parsed = parseFloat(result);
-                if (!isNaN(parsed) && isFinite(parsed)) {
-                    displayResult = this.formatNumber(parsed, formatSpec);
+                const t = result.trim();
+                // Radix literals: parseFloat('0b101') === 0 — show string as-is
+                if (/^(0b[01]+|0o[0-7]+|0x[0-9a-f]+)$/i.test(t)) {
+                    displayResult = result;
+                } else {
+                    const parsed = parseFloat(result);
+                    if (!isNaN(parsed) && isFinite(parsed)) {
+                        displayResult = this.formatNumber(parsed, formatSpec);
+                    }
                 }
             }
         }
@@ -1264,12 +1287,11 @@ class CloudyCalculator {
             this.history = state.history || [];
             this.variables = state.variables || { '@': 0 };
             
-            // Ensure @ variable is always a valid number
             if (this.variables['@'] !== undefined) {
-                const numValue = parseFloat(this.variables['@']);
-                if (isNaN(numValue) || !isFinite(numValue)) {
-                    this.variables['@'] = 0;
-                }
+                const numValue = this.parseNumericFromResult(this.variables['@']);
+                this.variables['@'] = (typeof numValue === 'number' && isFinite(numValue))
+                    ? snapNearIntegerFloat(numValue)
+                    : 0;
             } else {
                 this.variables['@'] = 0;
             }

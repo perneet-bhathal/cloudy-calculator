@@ -997,6 +997,62 @@ function snapNearIntegerFloat(num) {
     return num;
 }
 
+/**
+ * Slightly looser snap for unit conversion display only (e.g. 1/4 cup → tbsp → 3.999999991546 → 4).
+ * Does not shorten fractional results like 2.028841…; only collapses near-integer float noise.
+ */
+function snapConversionNearIntegerFloat(num) {
+    if (typeof num !== 'number' || !isFinite(num)) return num;
+    // Only fix noise near nonzero integers (e.g. 3.999999991546 → 4). Skip tiny magnitudes so
+    // e.g. 1 pg → st stays a small fraction, not 0.
+    if (Math.abs(num) < 1e-6) return num;
+    var r = Math.round(num);
+    var diff = Math.abs(num - r);
+    if (r === 0) return num;
+    if (Math.abs(r) > Number.MAX_SAFE_INTEGER) return num;
+    var tol = Math.max(1e-8, Math.abs(r) * 1e-10);
+    if (diff <= tol) return r;
+    return num;
+}
+
+/**
+ * Simple "X unit to/in Y" conversion display: concise (about 2–4 fraction digits) for everyday magnitudes,
+ * more digits when |value| &lt; 1 so small lengths/masses are not rounded away; huge/tiny → short scientific.
+ */
+function formatSimpleUnitConversionString(resultNum) {
+    resultNum = snapConversionNearIntegerFloat(resultNum);
+    if (!isFinite(resultNum)) return String(resultNum);
+    if (Number.isInteger(resultNum)) return String(resultNum);
+    var abs = Math.abs(resultNum);
+    if (abs !== 0 && (abs < 1e-6 || abs >= 1e7)) {
+        var sci = resultNum.toPrecision(4);
+        if (!/e/i.test(sci)) sci = String(parseFloat(sci));
+        return sci;
+    }
+    var dp;
+    if (abs >= 1000) dp = 3;
+    else if (abs >= 1) dp = 4;
+    else if (abs >= 0.01) dp = 6;
+    else dp = 8;
+    var s = resultNum.toFixed(dp);
+    s = s.replace(/(\.\d*?)0+$/, '$1');
+    s = s.replace(/\.$/, '');
+    return s;
+}
+
+/** String for final simple conversion results (convertFromBaseUnit / direct category convert). */
+function conversionNumericResultToString(resultNum) {
+    return formatSimpleUnitConversionString(resultNum);
+}
+
+/**
+ * Mixed-unit expression numeric part: full precision when the string will be re-parsed for another
+ * conversion (processInConversion / base); short conversion-style display when shown to the user only.
+ */
+function formatMixedUnitNumericOutput(num, highPrecisionChain) {
+    return highPrecisionChain ? numberStringForConversion(num) : formatSimpleUnitConversionString(num);
+}
+
 /** Temperature conversions need two decimal places (e.g. 373.15 K); formatNumber may pick one decimal (373.2). */
 function formatTemperatureResult(num) {
     if (typeof num !== 'number' || !isFinite(num)) return String(num);
@@ -1173,7 +1229,7 @@ function unitsJsCalc(input) {
         if (complexMatchEarly) {
             var multEarly = parseFloat(complexMatchEarly[1]);
             var innerUnitExprEarly = complexMatchEarly[2];
-            var innerResultEarly = processMixedUnits(innerUnitExprEarly);
+            var innerResultEarly = processMixedUnits(innerUnitExprEarly, true);
             if (innerResultEarly) {
                 var numMatchEarly = innerResultEarly.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
                 if (numMatchEarly) {
@@ -1185,7 +1241,7 @@ function unitsJsCalc(input) {
                 }
             }
         }
-        var innerResultOnly = processMixedUnits(innerExprEarly);
+        var innerResultOnly = processMixedUnits(innerExprEarly, true);
         if (innerResultOnly) {
             var numMatchOnly = innerResultOnly.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
             if (numMatchOnly) {
@@ -1217,7 +1273,7 @@ function unitsJsCalc(input) {
                 .trim();
             
             // Process mixed units first
-            var mixedResult = processMixedUnits(normalizedInput);
+            var mixedResult = processMixedUnits(normalizedInput, true);
             if (mixedResult) {
                 // Extract the numeric value and unit from the mixed result
                 // Handle formats like "3.5 l" or "3.5l" or "3.5 liter"
@@ -1440,7 +1496,9 @@ function unitsJsCalc(input) {
     // Skip math evaluation if input looks like it contains units (e.g., "3 ft + 5 inches")
     // Also try processMixedUnits first for any expression with units and operators
     var looksLikeUnits = /\b(ft|feet|in|inch|inches|m|meter|metre|meters|metres|km|mi|mile|miles|yd|yard|yards|cm|mm|kg|g|lb|lbs|pound|pounds|oz|ounce|ounces|gal|gallon|cup|cups|liter|litre|liters|litres|l|ml)\b/i.test(input);
-    if (looksLikeUnits && /[+\-]/.test(input)) {
+    // Word "in" also appears in "… in binary/octal/…" — do not run mixed-units on those (processBaseArithmetic handles them).
+    var radixTail = /\s+in\s+(binary|octal|hex|decimal)$/i.test(input);
+    if (looksLikeUnits && /[+\-]/.test(input) && !radixTail) {
         // Try processMixedUnits first for expressions with units and operators
         var mixedResult = processMixedUnits(input);
         if (mixedResult) {
@@ -1517,7 +1575,7 @@ function unitsJsCalc(input) {
         
         // Remove all parentheses and evaluate the expression
         var cleanExpr = innerExpr.replace(/[()]/g, '');
-        var result = processMixedUnits(cleanExpr);
+        var result = processMixedUnits(cleanExpr, true);
         if (result) {
             var numMatch = result.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
             if (numMatch) {
@@ -1539,7 +1597,7 @@ function unitsJsCalc(input) {
         
         // Remove all parentheses and evaluate the expression
         var cleanExpr = innerExpr.replace(/[()]/g, '');
-        var result = processMixedUnits(cleanExpr);
+        var result = processMixedUnits(cleanExpr, true);
         if (result) {
             var numMatch = result.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
             if (numMatch) {
@@ -1567,7 +1625,7 @@ function unitsJsCalc(input) {
             var secondUnit = unitExprMatch[3];
             
             // Use processMixedUnits to handle the entire expression
-            var mixedResult = processMixedUnits(firstUnit + operator + secondUnit);
+            var mixedResult = processMixedUnits(firstUnit + operator + secondUnit, true);
             if (mixedResult) {
                 var result = processInConversion(mixedResult, targetUnit);
                 if (result) {
@@ -1614,8 +1672,8 @@ function unitsJsCalc(input) {
             var operator = unitExprMatch[2];
             var secondUnit = unitExprMatch[3];
             
-            var firstResult = processMixedUnits(firstUnit);
-            var secondResult = processMixedUnits(secondUnit);
+            var firstResult = processMixedUnits(firstUnit, true);
+            var secondResult = processMixedUnits(secondUnit, true);
             
             if (firstResult && secondResult) {
                 var firstMatch = firstResult.match(/^([\d.]+)\s+([a-zA-Z\-²³]+)$/);
@@ -1698,7 +1756,7 @@ function unitsJsCalc(input) {
         // Check if the value contains mixed units with + or -
         if (value.match(/[+\-]/)) {
             // Handle mixed unit expressions with "in" conversion
-            var mixedResult = processMixedUnits(value);
+            var mixedResult = processMixedUnits(value, true);
             if (mixedResult) {
                 // Extract the numeric value and base unit from the mixed result
                 var mixedMatch = mixedResult.match(/^([\d.]+)\s+([a-zA-Zµ\-²³]+)$/);
@@ -1764,7 +1822,7 @@ function unitsJsCalc(input) {
         // Check if the value contains mixed units with + or -
         if (value.match(/[+\-]/)) {
             // Handle mixed unit expressions with "to" conversion
-            var mixedResult = processMixedUnits(value);
+            var mixedResult = processMixedUnits(value, true);
             if (mixedResult) {
                 // Extract the numeric value and base unit from the mixed result
                 var mixedMatch = mixedResult.match(/^([\d.]+)\s+([a-zA-Zµ\-²³]+)$/);
@@ -1910,22 +1968,8 @@ function convertFromBaseUnit(baseValue, baseUnit, targetUnit) {
         
         for (var unitKey in units) { if (!units.hasOwnProperty(unitKey)) continue; var unitName = unitKey; var factor = units[unitKey];
             if (unitName === normalizedTargetUnit || unitName === targetUnit || unitName === targetUnit.toLowerCase()) {
-                // (3) --- Boost precision for very small or large numbers in convertFromBaseUnit ---
                 var resultNum = baseValue / factor;
-                var strResult;
-                if (Math.abs(resultNum) < 1e-9) {
-                    strResult = resultNum.toPrecision(15);
-                } else if (Math.abs(resultNum) < 1e-4) {
-                    // Use up to 15 decimal places for small numbers to avoid scientific notation
-                    strResult = resultNum.toFixed(15);
-                } else if (Math.abs(resultNum) >= 1e5) {
-                    strResult = resultNum.toPrecision(12);
-                } else {
-                    strResult = resultNum.toFixed(12);
-                }
-                // Trim trailing zeros / decimal point
-                strResult = strResult.replace(/\.0+$/,'').replace(/(\.\d*[1-9])0+$/,'$1');
-                return strResult + " " + unitName;
+                return conversionNumericResultToString(resultNum) + " " + unitName;
             }
         }
     }
@@ -1953,7 +1997,7 @@ function processBaseArithmetic(expression, targetBase) {
         var parenUnitMatch = expression.match(/^\(([^)]+)\)$/);
         if (parenUnitMatch) {
             var innerUnitExpr = parenUnitMatch[1];
-            var innerResult = processMixedUnits(innerUnitExpr);
+            var innerResult = processMixedUnits(innerUnitExpr, true);
             if (innerResult) {
                 // Extract numeric value for base conversion
                 var numMatch = innerResult.match(/^([\d.]+)/);
@@ -1969,7 +2013,7 @@ function processBaseArithmetic(expression, targetBase) {
         if (complexParenMatch) {
             var multiplier = parseFloat(complexParenMatch[1]);
             var innerUnitExpr = complexParenMatch[2];
-            var innerResult = processMixedUnits(innerUnitExpr);
+            var innerResult = processMixedUnits(innerUnitExpr, true);
             if (innerResult) {
                 var numMatch = innerResult.match(/^([\d.]+)/);
                 if (numMatch) {
@@ -2040,7 +2084,9 @@ function convertToBase(decimalValue, targetBase) {
 }
 
 // Process mixed unit expressions
-function processMixedUnits(input) {
+// highPrecisionChain: true when the result string is fed into processInConversion (keep digits for accuracy).
+function processMixedUnits(input, highPrecisionChain) {
+    if (highPrecisionChain === undefined) highPrecisionChain = false;
     // Handle mixed fractions like "1 1/2 cup"
     var mixedFractionMatch = input.match(/^(\d+)\s+(\d+)\/(\d+)\s+([a-zA-Zµ\-²³]+)$/);
     if (mixedFractionMatch) {
@@ -2049,7 +2095,7 @@ function processMixedUnits(input) {
         var den = parseFloat(mixedFractionMatch[3]);
         var unit = mixedFractionMatch[4];
         var totalValue = whole + (num / den);
-        return totalValue.toFixed(6) + " " + unit;
+        return formatMixedUnitNumericOutput(totalValue, highPrecisionChain) + " " + unit;
     }
     
     // Handle no-space expressions like "10lb-2kg" or "5mi+3km"
@@ -2081,7 +2127,7 @@ function processMixedUnits(input) {
                 var firstUnitBaseValue = convertToBaseUnit(1, firstUnit);
                 if (firstUnitBaseValue && firstUnitBaseValue.unit === firstBaseValue.unit) {
                     var resultInFirstUnit = totalBaseValue / firstUnitBaseValue.value;
-                    formattedNum = numberStringForConversion(resultInFirstUnit);
+                    formattedNum = formatMixedUnitNumericOutput(resultInFirstUnit, highPrecisionChain);
                     unitToUse = firstUnit.trim();
                 } else {
                     // Fallback: return in base unit if conversion fails
@@ -2278,7 +2324,7 @@ function processMixedUnits(input) {
             var firstUnitBaseValue = convertToBaseUnit(1, firstOriginalUnit);
             if (firstUnitBaseValue && firstUnitBaseValue.unit === resultUnit) {
                 var resultInFirstUnit = cleanedResult / firstUnitBaseValue.value;
-                formattedNum = numberStringForConversion(resultInFirstUnit);
+                formattedNum = formatMixedUnitNumericOutput(resultInFirstUnit, highPrecisionChain);
                 unitToUse = firstOriginalUnit.trim();
             } else {
                 // Fallback: use base unit
@@ -2402,18 +2448,7 @@ function processInConversion(value, targetUnit) {
                 for (var targetKey in units) { if (!units.hasOwnProperty(targetKey)) continue; var targetUnitName = targetKey; var targetFactor = units[targetKey];
                     if (targetUnitName === normalizedTargetUnit || targetUnitName === targetUnit || targetUnitName === targetUnit.toLowerCase()) {
                         var resultNum = baseValue / targetFactor;
-                        var strResult;
-                        if (Math.abs(resultNum) < 1e-9) {
-                            strResult = resultNum.toPrecision(15);
-                        } else if (Math.abs(resultNum) < 1e-4) {
-                            strResult = resultNum.toFixed(15);
-                        } else if (Math.abs(resultNum) >= 1e5) {
-                            strResult = resultNum.toPrecision(12);
-                        } else {
-                            strResult = resultNum.toFixed(12);
-                        }
-                        strResult = strResult.replace(/\.0+$/, '').replace(/(\.\d*[1-9])0+$/, '$1');
-                        return strResult + " " + targetUnitName;
+                        return conversionNumericResultToString(resultNum) + " " + targetUnitName;
                     }
                 }
                 break;

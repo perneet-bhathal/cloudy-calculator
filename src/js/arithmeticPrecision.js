@@ -65,10 +65,8 @@
 
     function roundToDecimalPlaces(num, dp) {
         if (dp <= 0) return Math.round(num);
-        const m = Math.pow(10, dp);
-        const x = num * m;
-        const rounded = Math.round(x + (num >= 0 ? 1 : -1) * Number.EPSILON * Math.abs(x));
-        return rounded / m;
+        const safeDp = Math.min(15, Math.max(0, dp));
+        return Number(num.toFixed(safeDp));
     }
 
     function roundToSignificantFigures(num, sig) {
@@ -327,13 +325,47 @@
         }
     }
 
+    function gcdInt(a, b) {
+        a = Math.abs(Math.trunc(a));
+        b = Math.abs(Math.trunc(b));
+        while (b !== 0) {
+            const t = b;
+            b = a % b;
+            a = t;
+        }
+        return a || 1;
+    }
+
+    /** After reduction, decimal expansion terminates iff denominator has only 2 and 5 as prime factors. */
+    function denominatorTerminatesInBase10(qPos) {
+        let q = Math.abs(Math.trunc(qPos));
+        if (q === 0) return false;
+        while (q % 2 === 0) q /= 2;
+        while (q % 5 === 0) q /= 5;
+        return q === 1;
+    }
+
+    /** Signed integer from a literal optionally wrapped in unary minus (e.g. -52, 8). */
+    function signedIntegerLiteralValue(ast) {
+        let sign = 1;
+        let n = ast;
+        while (n && n.kind === 'neg') {
+            sign *= -1;
+            n = n.child;
+        }
+        if (!n || n.kind !== 'lit' || n.dp !== 0) return null;
+        const v = n.val;
+        if (typeof v !== 'number' || !isFinite(v) || !Number.isInteger(v)) return null;
+        return sign * v;
+    }
+
     function inferDisplayFormatSpec(expr) {
         const ast = parseAst(expr);
         if (!ast) return null;
         try {
             if (ast.kind === 'add' || ast.kind === 'sub') {
                 const dp = dpOfAddSub(ast);
-                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, dp)) };
+                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, dp)), trimTrailingZeros: false };
             }
             if (ast.kind === 'lit') {
                 return { type: 'sigFigs', n: Math.min(15, Math.max(1, ast.sig)) };
@@ -345,11 +377,20 @@
                     const sig = inferSig(ast);
                     return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
                 }
-                if (ast.left.kind === 'lit' && ast.right.kind === 'lit' && ast.left.dp === 0 && ast.right.dp === 0) {
-                    return { type: 'decimalPlaces', n: 15 };
+                const pInt = signedIntegerLiteralValue(ast.left);
+                const qInt = signedIntegerLiteralValue(ast.right);
+                if (pInt !== null && qInt !== null && qInt !== 0) {
+                    const g = gcdInt(pInt, qInt);
+                    const qRed = Math.abs(qInt / g);
+                    if (denominatorTerminatesInBase10(qRed)) {
+                        return { type: 'decimalPlaces', n: 15, trimTrailingZeros: true };
+                    }
+                    const sigOp = Math.min(inferSig(ast.left), inferSig(ast.right));
+                    const nSig = Math.min(15, Math.max(2, sigOp));
+                    return { type: 'sigFigs', n: nSig };
                 }
                 const md = maxLeafDp(ast);
-                return { type: 'decimalPlaces', n: Math.min(15, Math.max(md, 1)) };
+                return { type: 'decimalPlaces', n: Math.min(15, Math.max(md, 1)), trimTrailingZeros: false };
             }
             // Multiplication: if every leaf is a “decimal literal”, keep min sig figs; if any integer
             // literal appears (e.g. 70*1.44), use max decimal width so results don’t collapse to 100.
@@ -359,7 +400,7 @@
                     return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
                 }
                 const md = maxLeafDp(ast);
-                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, md)) };
+                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, md)), trimTrailingZeros: true };
             }
             const sig = inferSig(ast);
             return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
@@ -368,8 +409,7 @@
         }
     }
 
-    function formatArithmeticDisplay(expr, rawValue) {
-        const spec = inferDisplayFormatSpec(expr);
+    function formatWithSpec(rawValue, spec) {
         if (!spec || typeof rawValue !== 'number' || !isFinite(rawValue)) return null;
 
         if (spec.type === 'decimalPlaces') {
@@ -379,12 +419,18 @@
             }
             let v = roundToDecimalPlaces(rawValue, spec.n);
             v = snapNearIntegerFloat(v);
-            if (Number.isInteger(v) && Math.abs(v - rawValue) <= 1e-9 * Math.max(1, Math.abs(rawValue))) {
+            if (
+                spec.trimTrailingZeros &&
+                Number.isInteger(v) &&
+                Math.abs(v - rawValue) <= 1e-9 * Math.max(1, Math.abs(rawValue))
+            ) {
                 return String(v);
             }
             let s = v.toFixed(spec.n);
-            s = s.replace(/(\.\d*?)0+$/, '$1');
-            s = s.replace(/\.$/, '');
+            if (spec.trimTrailingZeros) {
+                s = s.replace(/(\.\d*?)0+$/, '$1');
+                s = s.replace(/\.$/, '');
+            }
             return s;
         }
 
@@ -400,6 +446,11 @@
         return s;
     }
 
+    function formatArithmeticDisplay(expr, rawValue) {
+        const spec = inferDisplayFormatSpec(expr);
+        return formatWithSpec(rawValue, spec);
+    }
+
     global.ArithmeticPrecision = {
         parseAst: parseAst,
         evalFull: evalFull,
@@ -410,6 +461,7 @@
         countDecimalPlacesFromLiteral: countDecimalPlacesFromLiteral,
         roundToSignificantFigures: roundToSignificantFigures,
         roundToDecimalPlaces: roundToDecimalPlaces,
-        snapNearIntegerFloat: snapNearIntegerFloat
+        snapNearIntegerFloat: snapNearIntegerFloat,
+        formatWithSpec: formatWithSpec
     };
 })(typeof window !== 'undefined' ? window : globalThis);
