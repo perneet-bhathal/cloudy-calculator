@@ -363,44 +363,19 @@
         const ast = parseAst(expr);
         if (!ast) return null;
         try {
-            if (ast.kind === 'add' || ast.kind === 'sub') {
-                const dp = dpOfAddSub(ast);
-                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, dp)), trimTrailingZeros: false };
+            // Ordinary arithmetic operators should display the evaluated value with only
+            // light floating-point cleanup (no aggressive sig-fig rounding).
+            if (
+                ast.kind === 'add' ||
+                ast.kind === 'sub' ||
+                ast.kind === 'mul' ||
+                ast.kind === 'div' ||
+                ast.kind === 'pow'
+            ) {
+                return { type: 'raw' };
             }
             if (ast.kind === 'lit') {
                 return { type: 'sigFigs', n: Math.min(15, Math.max(1, ast.sig)) };
-            }
-            // Division: integer/integer literals → enough decimals to show the real quotient;
-            // all-decimal operands → min sig figs (scientific-style); mixed → max leaf dp.
-            if (ast.kind === 'div') {
-                if (allLeafLiteralsHavePositiveDp(ast)) {
-                    const sig = inferSig(ast);
-                    return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
-                }
-                const pInt = signedIntegerLiteralValue(ast.left);
-                const qInt = signedIntegerLiteralValue(ast.right);
-                if (pInt !== null && qInt !== null && qInt !== 0) {
-                    const g = gcdInt(pInt, qInt);
-                    const qRed = Math.abs(qInt / g);
-                    if (denominatorTerminatesInBase10(qRed)) {
-                        return { type: 'decimalPlaces', n: 15, trimTrailingZeros: true };
-                    }
-                    const sigOp = Math.min(inferSig(ast.left), inferSig(ast.right));
-                    const nSig = Math.min(15, Math.max(2, sigOp));
-                    return { type: 'sigFigs', n: nSig };
-                }
-                const md = maxLeafDp(ast);
-                return { type: 'decimalPlaces', n: Math.min(15, Math.max(md, 1)), trimTrailingZeros: false };
-            }
-            // Multiplication: if every leaf is a “decimal literal”, keep min sig figs; if any integer
-            // literal appears (e.g. 70*1.44), use max decimal width so results don’t collapse to 100.
-            if (ast.kind === 'mul') {
-                if (allLeafLiteralsHavePositiveDp(ast)) {
-                    const sig = inferSig(ast);
-                    return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
-                }
-                const md = maxLeafDp(ast);
-                return { type: 'decimalPlaces', n: Math.min(15, Math.max(0, md)), trimTrailingZeros: true };
             }
             const sig = inferSig(ast);
             return { type: 'sigFigs', n: Math.min(15, Math.max(1, sig)) };
@@ -411,6 +386,24 @@
 
     function formatWithSpec(rawValue, spec) {
         if (!spec || typeof rawValue !== 'number' || !isFinite(rawValue)) return null;
+
+        if (spec.type === 'raw') {
+            let v = snapNearIntegerFloat(rawValue);
+            if (Number.isInteger(v)) return String(v);
+            let s = v.toPrecision(15);
+            if (s.indexOf('e') !== -1 || s.indexOf('E') !== -1) {
+                const parts = s.split(/e/i);
+                let mantissa = parts[0];
+                const exponent = parts.length > 1 ? 'e' + parts[1] : '';
+                if (mantissa.indexOf('.') !== -1) {
+                    mantissa = mantissa.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+                }
+                s = mantissa + exponent;
+            } else if (s.indexOf('.') !== -1) {
+                s = s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            }
+            return s;
+        }
 
         if (spec.type === 'decimalPlaces') {
             if (spec.n === 0) {

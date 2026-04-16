@@ -516,13 +516,13 @@
                 };
 
                 T('expr', { expr: '2+3*4' }, '14', 'AP396. 2+3*4 → 14 (order of ops; + uses decimal rule)');
-                T('expr', { expr: '183.95/13625.01' }, '0.013501', 'AP397. division → min sig figs (5) of operands');
-                T('expr', { expr: '1.23+4.5' }, '5.7', 'AP398. addition → min decimal places (1)');
-                T('expr', { expr: '2.5*3.14' }, '7.9', 'AP399. multiplication → min sig figs (2)');
+                T('expr', { expr: '183.95/13625.01' }, '≈0.0135009', 'AP397. division uses raw-clean display');
+                T('expr', { expr: '1.23+4.5' }, '5.73', 'AP398. addition keeps computed precision');
+                T('expr', { expr: '2.5*3.14' }, '7.85', 'AP399. multiplication keeps computed precision');
                 T('expr', { expr: '0.000052/0.0000000005' }, '104000', 'AP400. exact integer quotient snaps (float noise)');
-                T('expr', { expr: '10.0+1.00' }, '11.0', 'AP401. addition decimal places from operands');
+                T('expr', { expr: '10.0+1.00' }, '11', 'AP401. addition no longer pads trailing zeros');
                 T('expr', { expr: '(1.5+2.5)*2' }, '8', 'AP402. parens then multiply → sig figs');
-                T('expr', { expr: '5.00-2.0' }, '3.0', 'AP403. subtraction → min dp');
+                T('expr', { expr: '5.00-2.0' }, '3', 'AP403. subtraction no longer pads trailing zeros');
                 T('expr', { expr: '100/4' }, '25', 'AP404. integer-like result');
                 T('expr', { expr: '2^3' }, '8', 'AP405. power uses min sig figs of base and exponent');
 
@@ -536,6 +536,22 @@
                 T('expr', { expr: '60*1.44' }, '86.4', 'AP417. 60*1.44 → 86.4');
                 T('expr', { expr: '100*1.44' }, '144', 'AP418. 100*1.44 → 144');
                 T('expr', { expr: '5/2' }, '2.5', 'AP419. integer / integer exact half stays 2.5');
+                T('expr', { expr: '406.2+50' }, '456.2', 'AP420. decimal + integer preserves decimal width');
+                T('expr', { expr: '406.2+80' }, '486.2', 'AP421. decimal + integer preserves decimal width (regression)');
+                T('expr', { expr: '500-0.2' }, '499.8', 'AP422. integer - decimal preserves decimal width');
+                T('expr', { expr: '0.2+500' }, '500.2', 'AP423. decimal + integer order-independent display');
+                T('expr', { expr: '5/3' }, '1.66666666666667', 'AP424. repeating integer division should not round to 2 sig figs');
+                T('expr', { expr: '11/3' }, '3.66666666666667', 'AP425. repeating integer division keeps useful precision');
+                T('expr', { expr: '1/10' }, '0.1', 'AP426. denominator 10 shifts decimal left once');
+                T('expr', { expr: '1/1000' }, '0.001', 'AP427. denominator 1000 shifts decimal left thrice');
+                T('expr', { expr: '10/0.1' }, '100', 'AP428. decimal denominator shifts decimal right');
+                T('expr', { expr: '0.1/10' }, '0.01', 'AP429. decimal numerator then divide by 10');
+                T('expr', { expr: '12.34/100' }, '0.1234', 'AP430. division by 100 moves decimal two places');
+                T('expr', { expr: '123.45/1000' }, '0.12345', 'AP431. division by 1000 moves decimal three places');
+                T('expr', { expr: '0.00012*10000' }, '1.2', 'AP432. multiplication by 10000 shifts decimal right');
+                T('expr', { expr: '0.02*1000' }, '20', 'AP433. multiplication by 1000 yields integer when exact');
+                T('expr', { expr: '1.2*0.03' }, '0.036', 'AP434. decimal multiplication keeps scale');
+                T('expr', { expr: '3/0.12' }, '25', 'AP435. decimal denominator can produce exact integer');
 
                 T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
                 T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
