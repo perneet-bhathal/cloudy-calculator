@@ -54,8 +54,12 @@
 
     <div id="test-results"></div>
 
+    <script>
+        window.__CLOUDY_CALC_TEST_MODE__ = true;
+    </script>
     <script src="src/js/units.js"></script>
     <script src="src/js/arithmeticPrecision.js"></script>
+    <script src="src/js/popup.js"></script>
     <script>
         // Test suite for Cloudy Calculator
         class TestSuite {
@@ -540,8 +544,8 @@
                 T('expr', { expr: '406.2+80' }, '486.2', 'AP421. decimal + integer preserves decimal width (regression)');
                 T('expr', { expr: '500-0.2' }, '499.8', 'AP422. integer - decimal preserves decimal width');
                 T('expr', { expr: '0.2+500' }, '500.2', 'AP423. decimal + integer order-independent display');
-                T('expr', { expr: '5/3' }, '1.66666666666667', 'AP424. repeating integer division should not round to 2 sig figs');
-                T('expr', { expr: '11/3' }, '3.66666666666667', 'AP425. repeating integer division keeps useful precision');
+                T('expr', { expr: '5/3' }, '1.6666666666666667', 'AP424. repeating integer division should not round to 2 sig figs');
+                T('expr', { expr: '11/3' }, '3.6666666666666665', 'AP425. repeating integer division keeps useful precision');
                 T('expr', { expr: '1/10' }, '0.1', 'AP426. denominator 10 shifts decimal left once');
                 T('expr', { expr: '1/1000' }, '0.001', 'AP427. denominator 1000 shifts decimal left thrice');
                 T('expr', { expr: '10/0.1' }, '100', 'AP428. decimal denominator shifts decimal right');
@@ -552,6 +556,14 @@
                 T('expr', { expr: '0.02*1000' }, '20', 'AP433. multiplication by 1000 yields integer when exact');
                 T('expr', { expr: '1.2*0.03' }, '0.036', 'AP434. decimal multiplication keeps scale');
                 T('expr', { expr: '3/0.12' }, '25', 'AP435. decimal denominator can produce exact integer');
+                T('expr', { expr: '-21,370.28/1.2' }, '-17808.566666666666', 'AP436. ASCII comma-grouped input parses and evaluates');
+                T('expr', { expr: '1,000+250.5' }, '1250.5', 'AP437. grouped integer + decimal keeps expected display');
+                T('expr', { expr: '12,345*2' }, '24690', 'AP438. grouped integer multiplication parses cleanly');
+                T('expr', { expr: '21360/1,004' }, '21.274900398406373', 'AP439. grouped denominator parses in division');
+                T('popupFlow', { steps: ['-21,370.28/1.2', '+3'] }, '-17805.566666666666', 'AP440. +3 continues from last visible result');
+                T('popupFlow', { steps: ['-21,370.28/1.2', '-21,370.28/1.2'] }, '-17808.566666666666', 'AP441. pasted signed expression remains standalone on repeat');
+                T('popupFlow', { steps: ['-21,370.28/1.2', '-3'] }, '-17811.566666666666', 'AP442. simple -3 continues from last result');
+                T('popupFlow', { steps: ['5', '-(2+1)'] }, '-3', 'AP443. signed parenthesized expression is standalone');
 
                 T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
                 T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
@@ -568,24 +580,56 @@
                 });
             }
 
-            runArithmeticPrecisionTest(test) {
+            async runArithmeticPrecisionTest(test) {
                 try {
                     if (test.kind === 'sf') {
                         const n = ArithmeticPrecision.countSignificantFiguresFromLiteral(test.literal);
-                        return n === test.expected ? 'PASS' : 'FAIL';
+                        return { status: n === test.expected ? 'PASS' : 'FAIL', actual: String(n) };
                     }
                     if (test.kind === 'dp') {
                         const n = ArithmeticPrecision.countDecimalPlacesFromLiteral(test.literal);
-                        return n === test.expected ? 'PASS' : 'FAIL';
+                        return { status: n === test.expected ? 'PASS' : 'FAIL', actual: String(n) };
+                    }
+                    if (test.kind === 'popupFlow') {
+                        const host = document.createElement('div');
+                        host.innerHTML = [
+                            '<div id="calcResultsWrapper"><ul id="calcResults"></ul></div>',
+                            '<textarea id="calcInput"></textarea>',
+                            '<a id="clearAll"></a>',
+                            '<a id="popOut"></a>'
+                        ].join('');
+                        document.body.appendChild(host);
+
+                        const calc = Object.create(CloudyCalculator.prototype);
+                        calc.history = [];
+                        calc.historyIndex = -1;
+                        calc.variables = { '@': 0 };
+                        calc.calcInput = host.querySelector('#calcInput');
+                        calc.calcResults = host.querySelector('#calcResults');
+                        calc.calcResultsWrapper = host.querySelector('#calcResultsWrapper');
+                        calc.autoResize = function () {};
+                        calc.focusInput = function () {};
+                        calc.saveState = function () {};
+                        calc.scrollToBottom = function () {};
+
+                        for (let i = 0; i < test.steps.length; i++) {
+                            calc.calcInput.value = test.steps[i];
+                            await calc.processInput();
+                        }
+
+                        const values = calc.calcResults.querySelectorAll('.result-value');
+                        const last = values.length ? values[values.length - 1].textContent : '';
+                        document.body.removeChild(host);
+                        return { status: last === test.expected ? 'PASS' : 'FAIL', actual: String(last) };
                     }
                     if (test.kind === 'expr') {
                         const ast = ArithmeticPrecision.parseAst(test.expr);
-                        if (!ast) return 'FAIL';
+                        if (!ast) return { status: 'FAIL', actual: 'null' };
                         const raw = ArithmeticPrecision.evalFull(ast);
                         const disp = ArithmeticPrecision.formatArithmeticDisplay(test.expr, raw);
-                        if (disp === test.expected) return 'PASS';
+                        if (disp === test.expected) return { status: 'PASS', actual: String(disp) };
                         // Exact expected strings are strict display contracts.
-                        if (!test.expected.startsWith('≈')) return 'FAIL';
+                        if (!test.expected.startsWith('≈')) return { status: 'FAIL', actual: String(disp) };
                         let expectedStr = test.expected;
                         if (expectedStr.startsWith('≈')) expectedStr = expectedStr.substring(1);
                         const exp = parseFloat(expectedStr);
@@ -594,13 +638,13 @@
                             const tol = test.expected.startsWith('≈')
                                 ? Math.max(1e-9, Math.abs(exp) * 0.01)
                                 : Math.max(1e-9, Math.abs(exp) * 1e-6);
-                            if (Math.abs(exp - act) <= tol) return 'PASS';
+                            if (Math.abs(exp - act) <= tol) return { status: 'PASS', actual: String(disp) };
                         }
-                        return 'FAIL';
+                        return { status: 'FAIL', actual: String(disp) };
                     }
-                    return 'FAIL';
+                    return { status: 'FAIL', actual: 'unsupported-kind' };
                 } catch (e) {
-                    return 'ERROR';
+                    return { status: 'ERROR', actual: 'error' };
                 }
             }
 
@@ -700,11 +744,12 @@
 
                 for (let i = 0; i < this.arithmeticTests.length; i++) {
                     const test = this.arithmeticTests[i];
-                    const result = this.runArithmeticPrecisionTest(test);
-                    this.results.push({ test, result, arithmetic: true });
+                    const arithmeticResult = await this.runArithmeticPrecisionTest(test);
+                    const result = arithmeticResult.status;
+                    this.results.push({ test, result, arithmetic: true, actual: arithmeticResult.actual });
                     idx++;
                     document.getElementById('progress-fill').style.width = (idx / total * 100) + '%';
-                    this.addArithmeticTestResult(test, result);
+                    this.addArithmeticTestResult(test, result, arithmeticResult.actual);
                     await new Promise(resolve => setTimeout(resolve, 10));
                 }
                 
@@ -730,7 +775,7 @@
                 document.getElementById('test-results').appendChild(resultDiv);
             }
 
-            addArithmeticTestResult(test, result) {
+            addArithmeticTestResult(test, result, actualOverride) {
                 const resultDiv = document.createElement('div');
                 resultDiv.className = `test-item ${result.toLowerCase()}`;
                 resultDiv.dataset.runIndex = String(this._resultRunIndex++);
@@ -749,6 +794,9 @@
                     } else if (test.kind === 'dp') {
                         label = 'dp(' + test.literal + ')';
                         actual = String(ArithmeticPrecision.countDecimalPlacesFromLiteral(test.literal));
+                    } else if (test.kind === 'popupFlow') {
+                        label = 'popupFlow(' + test.steps.join(' -> ') + ')';
+                        actual = actualOverride || '';
                     }
                 } catch (e) {
                     actual = 'error';

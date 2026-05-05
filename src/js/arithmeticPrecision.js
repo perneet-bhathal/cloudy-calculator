@@ -10,6 +10,10 @@
 (function (global) {
     'use strict';
 
+    function stripGroupingCommas(text) {
+        return String(text).replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '');
+    }
+
     function snapNearIntegerFloat(num) {
         if (typeof num !== 'number' || !isFinite(num)) return num;
         const r = Math.round(num);
@@ -96,7 +100,7 @@
      * Parse expression into AST (only digits, operators, parentheses; no variables).
      */
     function parseAst(expr) {
-        let e = String(expr).replace(/\s/g, '').replace(/,/g, '');
+        let e = stripGroupingCommas(expr).replace(/\s/g, '');
         e = e.replace(/[+\-*/^]+$/, '');
         if (!e || /[a-zA-Z@]/.test(e)) return null;
 
@@ -384,25 +388,42 @@
         }
     }
 
+    /** Trim trailing zeros from fixed/scientific numeric strings (display only). */
+    function trimNumericDisplayString(s) {
+        if (!s || typeof s !== 'string') return s;
+        if (s.indexOf('e') !== -1 || s.indexOf('E') !== -1) {
+            const parts = s.split(/e/i);
+            let mantissa = parts[0];
+            const exponent = parts.length > 1 ? 'e' + parts[1] : '';
+            if (mantissa.indexOf('.') !== -1) {
+                mantissa = mantissa.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+            }
+            return mantissa + exponent;
+        }
+        if (s.indexOf('.') !== -1) {
+            return s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+        }
+        return s;
+    }
+
+    /** Raw arithmetic display: near-integer snap, then 15-digit precision + light cleanup. */
+    function formatRawArithmeticNumber(rawValue) {
+        const v = snapNearIntegerFloat(rawValue);
+        if (Number.isInteger(v)) return String(v);
+        const s17 = trimNumericDisplayString(Number(v.toPrecision(17)).toString());
+        const hasFloatArtifactTail =
+            s17.indexOf('e') === -1 &&
+            s17.indexOf('E') === -1 &&
+            /\.\d*(?:0{6,}\d|9{6,}\d)$/.test(s17);
+        if (!hasFloatArtifactTail) return s17;
+        return trimNumericDisplayString(Number(v.toPrecision(15)).toString());
+    }
+
     function formatWithSpec(rawValue, spec) {
         if (!spec || typeof rawValue !== 'number' || !isFinite(rawValue)) return null;
 
         if (spec.type === 'raw') {
-            let v = snapNearIntegerFloat(rawValue);
-            if (Number.isInteger(v)) return String(v);
-            let s = v.toPrecision(15);
-            if (s.indexOf('e') !== -1 || s.indexOf('E') !== -1) {
-                const parts = s.split(/e/i);
-                let mantissa = parts[0];
-                const exponent = parts.length > 1 ? 'e' + parts[1] : '';
-                if (mantissa.indexOf('.') !== -1) {
-                    mantissa = mantissa.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
-                }
-                s = mantissa + exponent;
-            } else if (s.indexOf('.') !== -1) {
-                s = s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
-            }
-            return s;
+            return formatRawArithmeticNumber(rawValue);
         }
 
         if (spec.type === 'decimalPlaces') {

@@ -4,7 +4,7 @@
  * If a float is within IEEE-754 noise of an integer, return that integer (e.g. 103999.99999999999 → 104000).
  * Avoids snapping tiny nonzero values (e.g. 1e-12) to 0.
  */
-function snapNearIntegerFloat(num) {
+function popupSnapNearIntegerFloat(num) {
     if (typeof num !== 'number' || !isFinite(num)) return num;
     const r = Math.round(num);
     const diff = Math.abs(num - r);
@@ -16,6 +16,13 @@ function snapNearIntegerFloat(num) {
     const tol = Math.max(1e-9, Math.abs(r) * 1e-12);
     if (diff <= tol) return r;
     return num;
+}
+
+/**
+ * Remove common thousands-separator comma variants before numeric parsing.
+ */
+function stripGroupingCommas(text) {
+    return String(text).replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '');
 }
 
 /*
@@ -131,6 +138,47 @@ class CloudyCalculator {
         this.init();
     }
 
+    /**
+     * True when an input that starts with an operator should continue from @.
+     */
+    shouldTreatAsContinuationInput(rawInput) {
+        const trimmedInput = String(rawInput || '').trim();
+        const startsWithContinuationOperator = /^[\*\/\^]/.test(trimmedInput);
+        const startsWithSignedOperator = /^[\+\-]/.test(trimmedInput);
+        const signedExpressionHasInternalOperators =
+            startsWithSignedOperator &&
+            /[*/^()]/.test(trimmedInput.slice(1));
+        return (
+            startsWithContinuationOperator ||
+            (startsWithSignedOperator && !signedExpressionHasInternalOperators)
+        );
+    }
+
+    /**
+     * Prefer the latest visible numeric result as the continuation base; fallback to @.
+     */
+    getContinuationBaseValue() {
+        if (this.calcResults) {
+            const resultItems = this.calcResults.querySelectorAll('.result-item');
+            if (resultItems && resultItems.length > 0) {
+                const lastItem = resultItems[resultItems.length - 1];
+                const lastValueNode = lastItem.querySelector('.result-value');
+                if (lastValueNode) {
+                    const displayed = (lastValueNode.dataset && lastValueNode.dataset.value)
+                        ? lastValueNode.dataset.value
+                        : lastValueNode.textContent;
+                    const parsedDisplayed = this.parseNumericFromResult(displayed);
+                    if (typeof parsedDisplayed === 'number' && isFinite(parsedDisplayed)) {
+                        return parsedDisplayed;
+                    }
+                }
+            }
+        }
+        const atRaw = this.variables['@'];
+        const parsedAt = this.parseNumericFromResult(atRaw);
+        return (typeof parsedAt === 'number' && isFinite(parsedAt)) ? parsedAt : 0;
+    }
+
     async init() {
         this.calcInput = document.getElementById('calcInput');
         this.calcResults = document.getElementById('calcResults');
@@ -196,7 +244,7 @@ class CloudyCalculator {
         if (typeof val !== 'string') {
             return NaN;
         }
-        const t = val.trim();
+        const t = stripGroupingCommas(val.trim());
         if (/^0b[01]+$/i.test(t)) {
             return parseInt(t.slice(2), 2);
         }
@@ -522,7 +570,7 @@ class CloudyCalculator {
                     this.addResult(input, unitsResult, 'units');
                     const n = this.parseNumericFromResult(unitsResult);
                     this.variables['@'] = (typeof n === 'number' && isFinite(n))
-                        ? snapNearIntegerFloat(n)
+                        ? popupSnapNearIntegerFloat(n)
                         : 0;
                     this.saveState();
                     this.calcInput.value = '';
@@ -531,11 +579,14 @@ class CloudyCalculator {
                 }
             }
 
-            // Handle expressions that start with operators (like *30, +20, etc.)
+            // Handle expressions that start with operators (like *30, +20, etc.).
+            // Treat leading +/- followed by a numeric literal as a standalone signed value,
+            // not a continuation from the previous result.
             let expression = input;
-            if (/^[\+\-\*\/\^]/.test(input.trim())) {
-                // If input starts with an operator, prepend the last result
-                expression = '@' + input;
+            if (this.shouldTreatAsContinuationInput(input)) {
+                const continuationBase = popupSnapNearIntegerFloat(this.getContinuationBaseValue());
+                // Build continuation expression directly from numeric base so stale @ cannot affect chaining.
+                expression = '(' + continuationBase + ')' + input;
             }
             
             // Substitute variables and evaluate
@@ -544,13 +595,14 @@ class CloudyCalculator {
             
             // ALWAYS store result as @ (ensure it's a valid number)
             if (typeof result === 'number' && isFinite(result)) {
-                this.variables['@'] = snapNearIntegerFloat(result);
+                this.variables['@'] = popupSnapNearIntegerFloat(result);
             } else {
                 // If result is not a valid number, set @ to 0
                 this.variables['@'] = 0;
             }
             
-            this.addResult(input, result);
+            const precisionSourceInput = this.shouldTreatAsContinuationInput(input) ? expression : input;
+            this.addResult(input, result, 'normal', precisionSourceInput);
             this.saveState();
 
         } catch (error) {
@@ -591,7 +643,7 @@ class CloudyCalculator {
                     this.variables[varName] = unitsResult;
                     const numValue = this.parseNumericFromResult(unitsResult);
                     this.variables['@'] = (typeof numValue === 'number' && isFinite(numValue))
-                        ? snapNearIntegerFloat(numValue)
+                        ? popupSnapNearIntegerFloat(numValue)
                         : 0;
                     this.addResult(input, `${varName} = ${unitsResult}`, 'units');
                     return true;
@@ -601,7 +653,7 @@ class CloudyCalculator {
             try {
                 const substituted = this.substituteVariables(expression);
                 const value = this.evaluateExpression(substituted);
-                const stored = typeof value === 'number' && isFinite(value) ? snapNearIntegerFloat(value) : value;
+                const stored = typeof value === 'number' && isFinite(value) ? popupSnapNearIntegerFloat(value) : value;
                 this.variables[varName] = stored;
                 // Ensure @ is set to a valid number
                 if (typeof value === 'number' && isFinite(value)) {
@@ -713,7 +765,7 @@ class CloudyCalculator {
 
     evaluateExpression(expression) {
         // Safe recursive descent parser
-        let expr = expression.replace(/\s/g, '').replace(/,/g, ''); // Remove spaces and commas
+        let expr = stripGroupingCommas(expression).replace(/\s/g, ''); // Remove spaces and grouping commas
         
         // Handle trailing operators by removing them
         // This allows expressions like "8+8+" to be treated as "8+8"
@@ -939,7 +991,7 @@ class CloudyCalculator {
             if (formattedByRule !== null) return formattedByRule;
         }
 
-        num = snapNearIntegerFloat(num);
+        num = popupSnapNearIntegerFloat(num);
         if (Number.isInteger(num)) {
             return String(num);
         }
@@ -1031,7 +1083,7 @@ class CloudyCalculator {
         return formatted.replace(/\.0+$/, '');
     }
 
-    addResult(input, result, type = 'normal') {
+    addResult(input, result, type = 'normal', precisionSourceInput = null) {
         const li = document.createElement('li');
         li.className = 'result-item';
         
@@ -1040,7 +1092,7 @@ class CloudyCalculator {
         inputSpan.textContent = `${input} =`;
         
         // Format the result to remove floating-point artifacts
-        const formatSpec = this.getDisplayFormatSpec(input);
+        const formatSpec = this.getDisplayFormatSpec(precisionSourceInput || input);
         let displayResult = result;
         if (typeof result === 'number' && isFinite(result)) {
             displayResult = this.formatNumber(result, formatSpec);
@@ -1290,7 +1342,7 @@ class CloudyCalculator {
             if (this.variables['@'] !== undefined) {
                 const numValue = this.parseNumericFromResult(this.variables['@']);
                 this.variables['@'] = (typeof numValue === 'number' && isFinite(numValue))
-                    ? snapNearIntegerFloat(numValue)
+                    ? popupSnapNearIntegerFloat(numValue)
                     : 0;
             } else {
                 this.variables['@'] = 0;
@@ -1374,8 +1426,10 @@ class CloudyCalculator {
 }
 
 // Initialize calculator when DOM is ready
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => new CloudyCalculator());
-} else {
-    new CloudyCalculator();
+if (!(typeof window !== 'undefined' && window.__CLOUDY_CALC_TEST_MODE__)) {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => new CloudyCalculator());
+    } else {
+        new CloudyCalculator();
+    }
 }
