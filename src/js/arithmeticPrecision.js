@@ -19,7 +19,9 @@
         const r = Math.round(num);
         const diff = Math.abs(num - r);
         if (r === 0) {
-            if (diff < 1e-15) return 0;
+            // Only collapse IEEE noise near 0 (about 1e-16). Keep real tiny values
+            // such as h*c ≈ 2e-25 and R/NA ≈ 1e-23.
+            if (diff < 1e-15 && diff >= 1e-18) return 0;
             return num;
         }
         if (Math.abs(r) > Number.MAX_SAFE_INTEGER) return num;

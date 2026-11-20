@@ -161,8 +161,16 @@
                 this.addTest("factorial(171)", "NaN/error", "68. factorial(171) → NaN/error");
 
                 // Constants tests
-                this.addTest("pi", "3.141592653589793", "69. pi → 3.141592653589793");
+                this.addTest("pi", "3.14", "69. pi → 3.14");
+                this.addTest("PI", "3.14", "69b. PI → 3.14");
+                this.addTest("pi*10", "31.41592653589793", "69c. pi*10 → 31.41592653589793 (not 31.4)");
+                this.addTest("10*pi", "31.41592653589793", "69d. 10*pi → 31.41592653589793");
+                this.addTest("pi * 10", "31.41592653589793", "69e. pi * 10 → 31.41592653589793");
+                this.addTest("pi/2", "1.5707963267948966", "69f. pi/2 → 1.5707963267948966");
+                this.addTest("2*pi", "6.283185307179586", "69g. 2*pi full precision");
+                this.addTest("pi*pi", "9.869604401089358", "69h. pi*pi → 9.869604401089358");
                 this.addTest("e", "2.718281828459045", "70. e → 2.718281828459045");
+                this.addTest("e*10", "27.18281828459045", "70b. e*10 → 27.18281828459045 (not 27.2)");
                 this.addTest("c", "299792458", "71. c → 299792458");
                 this.addTest("h", "6.62607015e-34", "72. h → 6.62607015e-34");
                 this.addTest("hbar", "1.054571817e-34", "73. hbar → 1.054571817e-34");
@@ -473,7 +481,7 @@
                 this.addTest("factorial(12)", "479001600", "358. factorial(12) → 479001600");
                 this.addTest("factorial(170)", "finite number", "359. factorial(170) → finite number (max safe)");
                 this.addTest("abs(-0.001)", "0.001", "360. abs(-0.001) → 0.001");
-                this.addTest("2*pi", "≈6.283185307", "361. 2*pi → ≈6.283185307");
+                this.addTest("2*pi", "6.283185307179586", "361. 2*pi → 6.283185307179586");
                 this.addTest("c / 1e6", "≈299.792458", "362. c / 1e6 → ≈299.792458");
                 this.addTest("h * c", "≈1.98644586e-25", "363. h * c → ≈1.98644586e-25");
                 this.addTest("phi^2 - phi", "1", "364. phi^2 - phi → 1 (golden ratio identity)");
@@ -564,6 +572,27 @@
                 T('popupFlow', { steps: ['-21,370.28/1.2', '-21,370.28/1.2'] }, '-17808.566666666666', 'AP441. pasted signed expression remains standalone on repeat');
                 T('popupFlow', { steps: ['-21,370.28/1.2', '-3'] }, '-17811.566666666666', 'AP442. simple -3 continues from last result');
                 T('popupFlow', { steps: ['5', '-(2+1)'] }, '-3', 'AP443. signed parenthesized expression is standalone');
+                // Constants keep full double precision (not one-decimal rounding: pi → 3.1, pi*10 → 31.4).
+                T('popupFlow', { steps: ['pi'] }, '3.14', 'AP444. pi displays 3.14, not 3.1');
+                T('popupFlow', { steps: ['PI'] }, '3.14', 'AP445. PI displays 3.14, not 3.1');
+                T('popupFlow', { steps: ['pi*10'] }, '31.41592653589793', 'AP446. pi*10 displays full double, not 31.4');
+                T('popupFlow', { steps: ['10*pi'] }, '31.41592653589793', 'AP447. 10*pi displays full double');
+                T('popupFlow', { steps: ['pi * 10'] }, '31.41592653589793', 'AP448. spaced pi * 10 displays full double');
+                T('popupFlow', { steps: ['2*pi'] }, '6.283185307179586', 'AP449. 2*pi displays full double');
+                T('popupFlow', { steps: ['pi/2'] }, '1.5707963267948966', 'AP450. pi/2 displays full double');
+                T('popupFlow', { steps: ['pi+pi'] }, '6.283185307179586', 'AP451. pi+pi displays full double');
+                T('popupFlow', { steps: ['pi*pi'] }, '9.869604401089358', 'AP452. pi*pi displays full double');
+                T('popupFlow', { steps: ['100*pi'] }, '314.1592653589793', 'AP453. 100*pi displays full double');
+
+                // Same session, and saved state from earlier sessions (user-reported: pi → 3.14 then pi*10 → 30)
+                T('popupFlow', { steps: ['pi', 'pi*10'] }, '31.41592653589793', 'AP455. pi then pi*10 in one session');
+                T('popupFlow', { steps: ['pi=3', 'pi*10'] }, '31.41592653589793', 'AP456. pi cannot be reassigned, so pi*10 stays correct');
+                T('popupFlow', { steps: ['pi=3'] }, 'Error: pi is a built-in constant and cannot be reassigned', 'AP457. assigning pi reports an error');
+                T('popupFlow', { steps: ['pi*10'], savedVariables: { pi: 3 } }, '31.41592653589793', 'AP458. saved pi variable from old state is dropped');
+                T('popupFlow', { steps: ['e*10'], savedVariables: { e: 2 } }, '27.18281828459045', 'AP459. saved e variable from old state is dropped');
+                T('popupFlow', { steps: ['x=5', 'x*pi'] }, '15.707963267948966', 'AP460. ordinary variables still work with pi');
+                T('popupFlow', { steps: ['e'] }, '2.718281828459045', 'AP454. e displays full double, not 2.7');
+                T('popupFlow', { steps: ['e*10'] }, '27.18281828459045', 'AP455. e*10 displays full double');
 
                 T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
                 T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
@@ -603,7 +632,8 @@
                         const calc = Object.create(CloudyCalculator.prototype);
                         calc.history = [];
                         calc.historyIndex = -1;
-                        calc.variables = { '@': 0 };
+                        calc.variables = Object.assign({ '@': 0 }, test.savedVariables || {});
+                        calc.cleanupVariables();
                         calc.calcInput = host.querySelector('#calcInput');
                         calc.calcResults = host.querySelector('#calcResults');
                         calc.calcResultsWrapper = host.querySelector('#calcResultsWrapper');

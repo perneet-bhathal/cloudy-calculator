@@ -12,7 +12,7 @@ and bug fixes for mixed-unit arithmetic.
 ## About this update
 
 - Based on the original Cloudy Calculator, but rebuilt from scratch to run locally
-- Fully passes the **395 comprehensive tests** in `comprehensive_tests.html` with **100% success**
+- Fully passes the **473 comprehensive tests** in `comprehensive_tests.html` with **100% success**
 - Enhanced unit parsing: recognizes plurals and common aliases (`liters`, `lbs`, `metres`, `hours`, …)
 - No dependencies on online services for math or unit conversions
 - Runs entirely offline — **no user data is stored or sent anywhere**

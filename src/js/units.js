@@ -1075,105 +1075,45 @@ function numberStringForConversion(num) {
     return s;
 }
 
+// Full round-trip display. The old half-ulp search accepted every decimal width and
+// then kept the shortest one, so pi became 3.1 and pi*10 became 31.4.
+function formatRoundTripNumber(num) {
+    num = snapNearIntegerFloat(num);
+    if (Number.isInteger(num)) return String(num);
+    var s = Number(num.toPrecision(17)).toString();
+    var hasFloatArtifactTail =
+        s.indexOf('e') === -1 &&
+        s.indexOf('E') === -1 &&
+        /\.\d*(?:0{6,}\d|9{6,}\d)$/.test(s);
+    if (hasFloatArtifactTail) {
+        s = Number(num.toPrecision(15)).toString();
+    }
+    if (s.indexOf('e') !== -1 || s.indexOf('E') !== -1) {
+        var parts = s.split(/e/i);
+        var mantissa = parts[0];
+        var exponent = parts.length > 1 ? 'e' + parts[1] : '';
+        if (mantissa.indexOf('.') !== -1) {
+            mantissa = mantissa.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+        }
+        return mantissa + exponent;
+    }
+    if (s.indexOf('.') !== -1) {
+        s = s.replace(/(\.\d*?)0+$/, '$1').replace(/\.$/, '');
+    }
+    return s;
+}
+
 // Helper function to format numbers and remove floating-point artifacts
 function formatNumber(num) {
     if (typeof num !== 'number' || !isFinite(num)) {
         return num;
     }
-    num = snapNearIntegerFloat(num);
-    if (Number.isInteger(num)) {
-        return String(num);
+    if (typeof ArithmeticPrecision !== 'undefined' &&
+        typeof ArithmeticPrecision.formatWithSpec === 'function') {
+        var formatted = ArithmeticPrecision.formatWithSpec(num, { type: 'raw' });
+        if (formatted !== null && formatted !== undefined) return formatted;
     }
-    // Avoid collapsing to "0" when rounding to 0 decimals (e.g. h·c ≈ 2e-25, R/NA ≈ 1e-23)
-    var absN = Math.abs(num);
-    if (absN > 0 && absN < 1e-14) {
-        return num.toExponential(6);
-    }
-
-    var maxDecimalPlaces = 15;
-    var candidates = [];
-    
-    for (var decimals = 0; decimals <= maxDecimalPlaces; decimals++) {
-        var multiplier = Math.pow(10, decimals);
-        var rounded = Math.round(num * multiplier) / multiplier;
-        var diff = Math.abs(num - rounded);
-        
-        var tol = decimals === 0 ? 1e-9 : 0.5 * Math.pow(10, -decimals) + 1e-12;
-        if (diff < tol) {
-            var testFormatted = rounded.toFixed(decimals);
-            // Check for artifact patterns:
-            // 1. Excessive trailing zeros (2+ zeros at the end)
-            // 2. Long strings of zeros followed by 1-2 digits (floating-point artifacts)
-            var decimalPart = testFormatted.split('.')[1] || '';
-            var trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
-            var hasArtifact = trailingZeros >= 2 || 
-                             testFormatted.match(/0{5,}[12]$/);
-            
-            if (!hasArtifact) {
-                candidates.push({
-                    precision: decimals,
-                    rounded: rounded,
-                    trailingZeros: trailingZeros
-                });
-            }
-        }
-    }
-    
-    // Choose the best candidate: prefer 0 trailing zeros at lowest precision, then 1 trailing zero
-    var best = candidates[0];
-    for (var i = 1; i < candidates.length; i++) {
-        var c = candidates[i];
-        if (c.trailingZeros === 0 && best.trailingZeros !== 0) {
-            // Always prefer 0 trailing zeros
-            best = c;
-        } else if (c.trailingZeros === 0 && best.trailingZeros === 0 && c.precision < best.precision) {
-            // If both have 0 trailing zeros, prefer lower precision
-            best = c;
-        } else if (c.trailingZeros === 1 && best.trailingZeros > 1) {
-            // Use 1 trailing zero only if no 0-trailing-zero option exists
-            best = c;
-        } else if (best.trailingZeros > 1 && c.precision > best.precision) {
-            // If no good option, prefer higher precision
-            best = c;
-        }
-    }
-    
-    // If no exact-match candidates found, find appropriate precision for the number
-    if (!best) {
-        // Check if the number has a fractional part
-        var hasFraction = Math.abs(num - Math.floor(num)) > 1e-9;
-        
-        if (hasFraction) {
-            // For numbers with fractional parts, find the precision that shows meaningful digits
-            // Try precisions from 2 to 6, looking for one that doesn't have excessive trailing zeros
-            for (var decimals = 2; decimals <= maxDecimalPlaces; decimals++) {
-                var multiplier = Math.pow(10, decimals);
-                var rounded = Math.round(num * multiplier) / multiplier;
-                var testFormatted = rounded.toFixed(decimals);
-                var decimalPart = testFormatted.split('.')[1] || '';
-                var trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
-                
-                if (trailingZeros <= 1) {
-                    return testFormatted.replace(/\.0+$/, '');
-                }
-            }
-            var s = num.toFixed(maxDecimalPlaces);
-            s = s.replace(/(\.\d*?)0+$/, '$1');
-            s = s.replace(/\.$/, '');
-            return s;
-        } else {
-            // Integer result - no decimal places needed
-            return Math.round(num).toString();
-        }
-    }
-    
-    var bestPrecision = best.precision;
-    var bestRounded = best.rounded;
-    
-    // Format with the best precision found
-    var formatted = bestRounded.toFixed(bestPrecision);
-    // Remove trailing zeros only if entire decimal part is zeros
-    return formatted.replace(/\.0+$/, '');
+    return formatRoundTripNumber(num);
 }
 
 // Mathematical functions
@@ -1381,6 +1321,8 @@ function unitsJsCalc(input) {
     // Check for constants
     for (var __key in CONSTANTS) { if (!CONSTANTS.hasOwnProperty(__key)) continue; var name = __key; var value = CONSTANTS[__key];
         if (input.toLowerCase() === name.toLowerCase()) {
+            // Bare pi is the common 3-significant-figure value, not 3.1 and not the full expansion.
+            if (name.toLowerCase() === 'pi') return '3.14';
             return value.toString();
         }
     }

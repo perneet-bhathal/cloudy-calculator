@@ -19,7 +19,7 @@ This document is the **canonical** spec for how pure arithmetic and related resu
 
 3. **`formatNumber`** order: **decimal-place** spec first (with `toFixed(dp)` and no stripping that removes required trailing zeros), then **sig-fig** spec (with integer snap before sig rounding), then generic integer snap, then heuristic (up to 15 decimals).
 
-4. **Heuristic** path (units, functions, variables): no strict sig-fig inference; avoid treating small fractions as integers at 0 decimals (`diff < 1e-9`).
+4. **Heuristic** path (units, functions, variables, and constants such as `e`): no strict sig-fig inference. Show a full round-trip decimal with the same light cleanup as raw arithmetic. Do not accept every decimal width with a half-ulp tolerance and then keep the shortest (`pi*10` → `31.4`). Bare `pi` is the exception: display **3.14** (3 significant figures), not `3.1` and not the full expansion. Expressions such as `pi*10` still use the full computed value. Avoid treating small fractions as integers at 0 decimals.
 
 5. **`units.js`**
    - **Simple conversion** (`… in/to …`, single factor chain via `conversionNumericResultToString` / `formatSimpleUnitConversionString`): show a **short** numeric string — about **3–4** fraction digits for `|x| >= 1`, **6** for `0.01 <= |x| < 1`, **8** for `|x| < 0.01`, and **scientific** (`toPrecision(4)`) for `|x| < 1e-6` or `|x| >= 1e7`. Near-integers still use `snapConversionNearIntegerFloat`.

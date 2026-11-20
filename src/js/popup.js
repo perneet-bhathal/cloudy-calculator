@@ -9,7 +9,9 @@ function popupSnapNearIntegerFloat(num) {
     const r = Math.round(num);
     const diff = Math.abs(num - r);
     if (r === 0) {
-        if (diff < 1e-15) return 0;
+        // Only collapse IEEE noise near 0 (about 1e-16). Keep real tiny values
+        // such as h*c ≈ 2e-25 and R/NA ≈ 1e-23.
+        if (diff < 1e-15 && diff >= 1e-18) return 0;
         return num;
     }
     if (Math.abs(r) > Number.MAX_SAFE_INTEGER) return num;
@@ -219,9 +221,18 @@ class CloudyCalculator {
     /**
      * Cleans up variables to ensure they contain valid numbers
      */
+    isReservedConstantName(name) {
+        return /^(pi|e)$/i.test(String(name || ''));
+    }
+
     cleanupVariables() {
         for (const [name, value] of Object.entries(this.variables)) {
             if (name === '@') continue; // @ is handled separately
+            // A saved "pi" or "e" variable would shadow the constant in expressions only (pi*10 → 30).
+            if (this.isReservedConstantName(name)) {
+                delete this.variables[name];
+                continue;
+            }
             
             const numValue = parseFloat(value);
             if (isNaN(numValue) || !isFinite(numValue)) {
@@ -635,6 +646,11 @@ class CloudyCalculator {
         const evalMatch = input.match(/^(@?\w+)\s*=\s*(.+)$/);
         if (evalMatch) {
             const [, varName, expression] = evalMatch;
+
+            if (this.isReservedConstantName(varName)) {
+                this.addResult(input, `Error: ${varName} is a built-in constant and cannot be reassigned`, 'error');
+                return true;
+            }
             
             // Check if the expression looks like a unit conversion query
             if (this.looksLikeUnitQuery(expression)) {
@@ -751,14 +767,14 @@ class CloudyCalculator {
 
         // Substitute other variables (skip '@' which is already handled)
         for (const [name, value] of Object.entries(this.variables)) {
-            if (name === '@') continue;
+            if (name === '@' || this.isReservedConstantName(name)) continue;
             const regex = new RegExp('\\b' + name.replace(/[$]/g, '\\$&') + '\\b', 'g');
             expr = expr.replace(regex, value.toString());
         }
 
-        // Substitute constants
-        expr = expr.replace(/\bpi\b/g, Math.PI.toString());
-        expr = expr.replace(/\be\b/g, Math.E.toString());
+        // Substitute constants (any case: pi, PI, e, E). \b keeps scientific notation such as 1E3 intact.
+        expr = expr.replace(/\bpi\b/gi, Math.PI.toString());
+        expr = expr.replace(/\be\b/gi, Math.E.toString());
 
         return expr;
     }
@@ -967,8 +983,26 @@ class CloudyCalculator {
     getDisplayFormatSpec(input) {
         if (typeof ArithmeticPrecision === 'undefined') return null;
         if (!input || typeof input !== 'string') return null;
-        if (/[a-zA-Z@]/.test(input)) return null;
-        return ArithmeticPrecision.inferDisplayFormatSpec(input);
+
+        // Bare pi displays as 3.14. Expressions such as pi*10 still use the full value below.
+        if (/^\s*pi\s*$/i.test(input)) {
+            return { type: 'sigFigs', n: 3 };
+        }
+
+        // Other constants keep full precision. Leaving the letters in place skips arithmetic
+        // display rules and the heuristic then keeps only one decimal (pi*10 → 31.4).
+        const withConstants = input
+            .replace(/\bpi\b/gi, '(' + Math.PI.toString() + ')')
+            .replace(/\be\b/gi, '(' + Math.E.toString() + ')');
+        const substituted = withConstants !== input;
+        const source = substituted ? withConstants : input;
+        if (/[a-zA-Z@]/.test(source)) return null;
+        const spec = ArithmeticPrecision.inferDisplayFormatSpec(source);
+        // A lone constant is a single literal; sig-fig rounding would drop a digit.
+        if (substituted && spec && spec.type === 'sigFigs') {
+            return { type: 'raw' };
+        }
+        return spec;
     }
 
     formatNumber(num, formatSpec = null) {
@@ -996,91 +1030,18 @@ class CloudyCalculator {
             return String(num);
         }
 
-        // Heuristic when precision is unknown: match float without over-rounding (up to 15 decimal places)
-        const candidates = [];
+        // Heuristic when precision is unknown (constants, functions, units, variables).
+        // Show a full round-trip decimal with light float-noise cleanup.
+        // A half-ulp tolerance accepts every width, so the old loop displayed pi as 3.1 and pi*10 as 31.4.
+        if (
+            typeof ArithmeticPrecision !== 'undefined' &&
+            typeof ArithmeticPrecision.formatWithSpec === 'function'
+        ) {
+            const rawFormatted = ArithmeticPrecision.formatWithSpec(num, { type: 'raw' });
+            if (rawFormatted !== null && rawFormatted !== undefined) return rawFormatted;
+        }
 
-        for (let decimals = 0; decimals <= maxDecimalPlaces; decimals++) {
-            const multiplier = Math.pow(10, decimals);
-            const rounded = Math.round(num * multiplier) / multiplier;
-            const diff = Math.abs(num - rounded);
-
-            // At 0 decimals, only accept true integers (else 0.01 would "match" 0)
-            const tol = decimals === 0 ? 1e-9 : 0.5 * Math.pow(10, -decimals) + 1e-12;
-            if (diff < tol) {
-                const testFormatted = rounded.toFixed(decimals);
-                // Check for artifact patterns:
-                // 1. Excessive trailing zeros (2+ zeros at the end)
-                // 2. Long strings of zeros followed by 1-2 digits (floating-point artifacts)
-                const decimalPart = testFormatted.split('.')[1] || '';
-                const trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
-                const hasArtifact = trailingZeros >= 2 || 
-                                   testFormatted.match(/0{5,}[12]$/);
-                
-                if (!hasArtifact) {
-                    candidates.push({
-                        precision: decimals,
-                        rounded: rounded,
-                        trailingZeros: trailingZeros
-                    });
-                }
-            }
-        }
-        
-        // Choose the best candidate: prefer 0 trailing zeros at lowest precision, then 1 trailing zero
-        let best = candidates[0];
-        for (let i = 1; i < candidates.length; i++) {
-            const c = candidates[i];
-            if (c.trailingZeros === 0 && best.trailingZeros !== 0) {
-                // Always prefer 0 trailing zeros
-                best = c;
-            } else if (c.trailingZeros === 0 && best.trailingZeros === 0 && c.precision < best.precision) {
-                // If both have 0 trailing zeros, prefer lower precision
-                best = c;
-            } else if (c.trailingZeros === 1 && best.trailingZeros > 1) {
-                // Use 1 trailing zero only if no 0-trailing-zero option exists
-                best = c;
-            } else if (best.trailingZeros > 1 && c.precision > best.precision) {
-                // If no good option, prefer higher precision
-                best = c;
-            }
-        }
-        
-        // If no exact-match candidates found, find appropriate precision for the number
-        if (!best) {
-            // Check if the number has a fractional part
-            const hasFraction = Math.abs(num - Math.floor(num)) > 1e-9;
-            
-            if (hasFraction) {
-                // For numbers with fractional parts, find the precision that shows meaningful digits
-                for (let decimals = 2; decimals <= maxDecimalPlaces; decimals++) {
-                    const multiplier = Math.pow(10, decimals);
-                    const rounded = Math.round(num * multiplier) / multiplier;
-                    const testFormatted = rounded.toFixed(decimals);
-                    const decimalPart = testFormatted.split('.')[1] || '';
-                    const trailingZeros = (decimalPart.match(/0+$/) || [''])[0].length;
-                    
-                    // Prefer precision with 0-1 trailing zeros
-                    if (trailingZeros <= 1) {
-                        return testFormatted.replace(/\.0+$/, '');
-                    }
-                }
-                let s = num.toFixed(maxDecimalPlaces);
-                s = s.replace(/(\.\d*?)0+$/, '$1');
-                s = s.replace(/\.$/, '');
-                return s;
-            } else {
-                // Integer result - no decimal places needed
-                return Math.round(num).toString();
-            }
-        }
-        
-        const bestPrecision = best.precision;
-        const bestRounded = best.rounded;
-        
-        // Format with the best precision found
-        const formatted = bestRounded.toFixed(bestPrecision);
-        // Remove trailing zeros only if entire decimal part is zeros
-        return formatted.replace(/\.0+$/, '');
+        return String(num);
     }
 
     addResult(input, result, type = 'normal', precisionSourceInput = null) {
