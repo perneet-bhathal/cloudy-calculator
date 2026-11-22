@@ -57,17 +57,49 @@
 				<td><input id="inputFont" type="text" tabindex="1" placeholder="e.g., Courier"/></td>	
 				<td><button class="reset" tabindex="2">reset</button></td>				
 			</tr>
+			<!--calculation-->
+			<tr>
+				<th colspan="3">Calculation</th>
+			</tr>
+			<tr>
+				<td><label for="resultDigits">Result digits</label></td>
+				<td><input id="resultDigits" type="text" tabindex="1" placeholder="full"/></td>
+				<td><button class="reset" tabindex="2">reset</button></td>
+			</tr>
+			<tr>
+				<td colspan="3">
+					<div class="optionInfo">full keeps the built-in display. 1–15 forces that many significant digits. 15 is full double precision.</div>
+				</td>
+			</tr>
+			<tr>
+				<td><label for="onlineEngines">Online engines</label></td>
+				<td>
+					<select id="onlineEngines" tabindex="1">
+						<option value="fallback">Fallback</option>
+						<option value="prefer">Prefer Google / Wolfram</option>
+						<option value="off">Off</option>
+					</select>
+				</td>
+				<td><button class="reset" tabindex="2">reset</button></td>
+			</tr>
+			<tr>
+				<td colspan="3">
+					<div class="optionInfo">Fallback asks Google, then Wolfram, when local math fails. Prefer tries them first. Suffixes: :g Google, :w Wolfram, :c local only.</div>
+				</td>
+			</tr>
+			<tr>
+				<td colspan="3">
+					<label for="wolframAppId">Wolfram App ID</label>
+					<div class="fullInput">
+						<input type="text" id="wolframAppId" tabindex="1" placeholder="From developer.wolframalpha.com"/>
+					</div>
+					<div class="optionInfo">This App ID is used until you replace it. Clear the field to turn Wolfram off. Google calculator does not need a key.</div>
+				</td>
+			</tr>
 			<!--shortcut key-->
 			<tr>
 				<th colspan="3">Special Options</th>
 			</tr>
-			<tr>
-				<td colspan="3">
-					<div class="optionInfo">
-						NOTE: These options require <br/><a href="https://chrome.google.com/webstore/detail/hfgnndipkjcpghbagmmcemdbjfclkcla" target="_tab">Cloudy Calculator Enhancer</a> 
-					</div>
-				</td>
-			</tr>			
 			<tr>
 				<td colspan="3">
 					<input type="checkbox" id="quickKeyOn"/>

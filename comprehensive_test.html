@@ -537,6 +537,9 @@
                 T('expr', { expr: '5.00-2.0' }, '3', 'AP403. subtraction no longer pads trailing zeros');
                 T('expr', { expr: '100/4' }, '25', 'AP404. integer-like result');
                 T('expr', { expr: '2^3' }, '8', 'AP405. power uses min sig figs of base and exponent');
+                T('expr', { expr: '2^3^2' }, '512', 'AP461. power is right-associative');
+                T('expr', { expr: '-2^2' }, '-4', 'AP462. unary minus is below power');
+                T('expr', { expr: '2^-2' }, '0.25', 'AP463. negative exponent');
 
                 // User-reported regression: integer×decimal must not collapse to wrong magnitude; int/int division must show decimals
                 T('expr', { expr: '1031/9734' }, '≈0.1059', 'AP411. long division → reasonable decimal (not over-rounded)');
@@ -593,6 +596,124 @@
                 T('popupFlow', { steps: ['x=5', 'x*pi'] }, '15.707963267948966', 'AP460. ordinary variables still work with pi');
                 T('popupFlow', { steps: ['e'] }, '2.718281828459045', 'AP454. e displays full double, not 2.7');
                 T('popupFlow', { steps: ['e*10'] }, '27.18281828459045', 'AP455. e*10 displays full double');
+                T('popupFlow', { steps: ['2^3^2'] }, '512', 'AP464. popup power is right-associative');
+                T('popupFlow', { steps: ['-2^2'] }, '-4', 'AP465. popup unary minus is below power');
+                T('popupFlow', { steps: ['2^-2'] }, '0.25', 'AP466. popup negative exponent');
+                T('popupFlow', { steps: ['2(3+4)'] }, '14', 'AP467. juxtaposition 2(3+4) is multiplication');
+                T('popupFlow', { steps: ['2pi'] }, '6.283185307179586', 'AP468. juxtaposition 2pi multiplies');
+
+                // Precedence, juxtaposition, scientific notation, and the Result digits option.
+                // Existing cases above stay as they are.
+                T('expr', { expr: '2**3**2' }, '512', 'AP469. ** is right-associative');
+                T('expr', { expr: '(2^3)^2' }, '64', 'AP470. parentheses override power associativity');
+                T('expr', { expr: '2^2^3' }, '256', 'AP471. 2^2^3 = 2^(2^3)');
+                T('expr', { expr: '-2^3' }, '-8', 'AP472. unary minus below a cubed power');
+                T('expr', { expr: '(-2)^2' }, '4', 'AP473. parentheses make the base negative');
+                T('expr', { expr: '(-2)^3' }, '-8', 'AP474. odd power of a negative base');
+                T('expr', { expr: '2^-3^2' }, '0.001953125', 'AP475. 2^(-(3^2))');
+                T('expr', { expr: '2^-2^2' }, '0.0625', 'AP476. 2^(-(2^2))');
+                T('expr', { expr: '-2^-2' }, '-0.25', 'AP477. -(2^-2)');
+                T('expr', { expr: '2*-3^2' }, '-18', 'AP478. 2 * -(3^2)');
+                T('expr', { expr: '-2^2*3' }, '-12', 'AP479. -(2^2)*3');
+                T('expr', { expr: '2^3*4' }, '32', 'AP480. power before multiply');
+                T('expr', { expr: '2*3^2' }, '18', 'AP481. power before multiply, right operand');
+                T('expr', { expr: '2+3*4^2' }, '50', 'AP482. power, then multiply, then add');
+                T('expr', { expr: '(2+3)*4^2' }, '80', 'AP483. parentheses before power');
+                T('expr', { expr: '8/2/2' }, '2', 'AP484. division is left-associative');
+                T('expr', { expr: '8/2*2' }, '8', 'AP485. division and multiply share left-to-right');
+                T('expr', { expr: '4^0.5' }, '2', 'AP486. fractional power');
+                T('expr', { expr: '2^0' }, '1', 'AP487. anything to the power 0');
+                T('expr', { expr: '2^10' }, '1024', 'AP488. 2^10');
+                T('expr', { expr: '10^2' }, '100', 'AP489. 10^2');
+                T('expr', { expr: '--2' }, '2', 'AP490. double unary minus');
+                T('expr', { expr: '2--3' }, '5', 'AP491. subtract a negative');
+                T('expr', { expr: '-2+-3' }, '-5', 'AP492. add two negatives');
+                T('expr', { expr: '-(2+3)*4' }, '-20', 'AP493. unary minus on a sum, then multiply');
+                T('expr', { expr: '1e3' }, '1000', 'AP494. scientific notation is not multiplication');
+                T('expr', { expr: '2e-3' }, '0.002', 'AP495. scientific notation with a negative exponent');
+                T('expr', { expr: '1.5e2' }, '150', 'AP496. decimal mantissa scientific notation');
+                T('expr', { expr: '2e3+1' }, '2001', 'AP497. scientific number then addition');
+                T('expr', { expr: '1,000^2' }, '1000000', 'AP498. grouped thousands then power');
+
+                T('popupFlow', { steps: ['2**3**2'] }, '512', 'AP499. popup ** is right-associative');
+                T('popupFlow', { steps: ['(2^3)^2'] }, '64', 'AP500. popup parentheses override power associativity');
+                T('popupFlow', { steps: ['2^2^3'] }, '256', 'AP501. popup 2^2^3 = 256');
+                T('popupFlow', { steps: ['-2^3'] }, '-8', 'AP502. popup -2^3 = -8');
+                T('popupFlow', { steps: ['(-2)^2'] }, '4', 'AP503. popup (-2)^2 = 4');
+                T('popupFlow', { steps: ['(-2)^3'] }, '-8', 'AP504. popup (-2)^3 = -8');
+                T('popupFlow', { steps: ['2^-3^2'] }, '0.001953125', 'AP505. popup 2^-3^2');
+                T('popupFlow', { steps: ['2^-2^2'] }, '0.0625', 'AP506. popup 2^-2^2');
+                T('popupFlow', { steps: ['-2^-2'] }, '-0.25', 'AP507. popup -2^-2');
+                T('popupFlow', { steps: ['2*-3^2'] }, '-18', 'AP508. popup 2*-3^2');
+                T('popupFlow', { steps: ['-2^2*3'] }, '-12', 'AP509. popup -2^2*3');
+                T('popupFlow', { steps: ['2^3*4'] }, '32', 'AP510. popup power before multiply');
+                T('popupFlow', { steps: ['2*3^2'] }, '18', 'AP511. popup 2*3^2');
+                T('popupFlow', { steps: ['2+3*4^2'] }, '50', 'AP512. popup 2+3*4^2');
+                T('popupFlow', { steps: ['(2+3)*4^2'] }, '80', 'AP513. popup (2+3)*4^2');
+                T('popupFlow', { steps: ['8/2/2'] }, '2', 'AP514. popup division is left-associative');
+                T('popupFlow', { steps: ['8/2*2'] }, '8', 'AP515. popup 8/2*2');
+                T('popupFlow', { steps: ['4^0.5'] }, '2', 'AP516. popup square root via power');
+                T('popupFlow', { steps: ['2^10'] }, '1024', 'AP517. popup 2^10');
+                T('popupFlow', { steps: ['2 ^ 3 ^ 2'] }, '512', 'AP518. spaces do not change power associativity');
+                T('popupFlow', { steps: ['- 2 ^ 2'] }, '-4', 'AP519. spaces do not change unary minus');
+                T('popupFlow', { steps: ['2--3'] }, '5', 'AP520. popup subtract a negative');
+                T('popupFlow', { steps: ['-(2+3)*4'] }, '-20', 'AP521. popup unary minus on a sum');
+                T('popupFlow', { steps: ['1e3'] }, '1000', 'AP522. 1e3 stays scientific notation');
+                T('popupFlow', { steps: ['2e-3'] }, '0.002', 'AP523. 2e-3 is 0.002, not 2*e-3');
+                T('popupFlow', { steps: ['2E10'] }, '20000000000', 'AP524. 2E10 scientific notation');
+                T('popupFlow', { steps: ['1.5e2'] }, '150', 'AP525. 1.5e2');
+                T('popupFlow', { steps: ['2e3+1'] }, '2001', 'AP526. scientific number then addition');
+                T('popupFlow', { steps: ['12e4'] }, '120000', 'AP527. 12e4 is not 12*e*4');
+                T('popupFlow', { steps: ['100*2='] }, '200', 'AP528. trailing equals is ignored');
+
+                T('popupFlow', { steps: ['2 (3+4)'] }, '14', 'AP529. spaced juxtaposition');
+                T('popupFlow', { steps: ['(2+3)(4+5)'] }, '45', 'AP530. )( is multiplication');
+                T('popupFlow', { steps: ['(2+3)4'] }, '20', 'AP531. )digit is multiplication');
+                T('popupFlow', { steps: ['2(3)(4)'] }, '24', 'AP532. chained juxtaposition');
+                T('popupFlow', { steps: ['(2)(3)'] }, '6', 'AP533. (2)(3)');
+                T('popupFlow', { steps: ['4(2+3)^2'] }, '100', 'AP534. juxtaposition then power');
+                T('popupFlow', { steps: ['2(1+2)^2'] }, '18', 'AP535. 2*(1+2)^2');
+                T('popupFlow', { steps: ['8/2(2+2)'] }, '16', 'AP536. 8/2(2+2) is left-to-right');
+                T('popupFlow', { steps: ['pi(2)'] }, '6.283185307179586', 'AP537. pi(2)');
+                T('popupFlow', { steps: ['pi2'] }, '6.283185307179586', 'AP538. pi2');
+                T('popupFlow', { steps: ['3pi'] }, '9.42477796076938', 'AP539. 3pi');
+                T('popupFlow', { steps: ['2pi*2'] }, '12.566370614359172', 'AP540. 2pi*2');
+                T('popupFlow', { steps: ['2pi^2'] }, '19.739208802178716', 'AP541. 2*pi^2');
+                T('popupFlow', { steps: ['(2pi)^2'] }, '39.47841760435743', 'AP542. (2pi)^2');
+                T('popupFlow', { steps: ['pi(2+3)'] }, '15.707963267948966', 'AP543. pi(2+3)');
+                T('popupFlow', { steps: ['2e'] }, '5.43656365691809', 'AP544. 2e is 2*e, unlike 2e3');
+                T('popupFlow', { steps: ['e2'] }, '5.43656365691809', 'AP545. e2 is e*2');
+
+                T('popupFlow', { steps: ['sqrt(4)'] }, '2', 'AP546. sqrt(4)');
+                T('popupFlow', { steps: ['sqrt(9)'] }, '3', 'AP547. sqrt(9)');
+                T('popupFlow', { steps: ['sqrt4'] }, '2', 'AP548. sqrt4 implicit argument');
+                T('popupFlow', { steps: ['sin(90)'] }, '0.8939966636005579', 'AP549. parenthesized sin(90) uses radians, same as sin(pi)');
+                T('popupFlow', { steps: ['sin90'] }, '1', 'AP550. sin90 implicit argument');
+                T('popupFlow', { steps: ['cos(0)'] }, '1', 'AP551. cos(0)');
+                T('popupFlow', { steps: ['log(100)'] }, '2', 'AP552. log(100)');
+                T('popupFlow', { steps: ['log(1000)'] }, '3', 'AP553. log(1000)');
+                T('popupFlow', { steps: ['ln(1)'] }, '0', 'AP554. ln(1)');
+                T('popupFlow', { steps: ['abs(-3.5)'] }, '3.5', 'AP555. abs');
+                T('popupFlow', { steps: ['2*sqrt(9)'] }, '6', 'AP556. multiply a square root');
+
+                T('popupFlow', { steps: ['2^3^2', '+1'] }, '513', 'AP557. continuation after a power tower');
+                T('popupFlow', { steps: ['1/3'] }, '0.3333333333333333', 'AP558. 1/3 keeps full precision by default');
+                T('popupFlow', { steps: ['5/3'] }, '1.6666666666666667', 'AP559. popup 5/3 matches the arithmetic display');
+
+                T('popupFlow', { steps: ['pi'], resultDigits: 'full' }, '3.14', 'AP560. result digits full keeps bare pi at 3.14');
+                T('popupFlow', { steps: ['pi*10'], resultDigits: 15 }, '31.41592653589793', 'AP561. 15 digits keeps the full pi*10 value');
+                T('popupFlow', { steps: ['pi*10'], resultDigits: 6 }, '31.4159', 'AP562. 6 significant digits');
+                T('popupFlow', { steps: ['pi*10'], resultDigits: 4 }, '31.42', 'AP563. 4 significant digits rounds pi*10');
+                T('popupFlow', { steps: ['2.5*3.14'], resultDigits: 2 }, '7.9', 'AP564. 2 significant digits');
+                T('popupFlow', { steps: ['2.5*3.14'] }, '7.85', 'AP565. default digits do not round 2.5*3.14');
+                T('popupFlow', { steps: ['123.456789*1'], resultDigits: 6 }, '123.457', 'AP566. 6 digits on a long decimal');
+                T('popupFlow', { steps: ['1/3'], resultDigits: 8 }, '0.33333333', 'AP567. 8 digits on a repeating fraction');
+                T('popupFlow', { steps: ['100*1.44'], resultDigits: 1 }, '100', 'AP568. 1 significant digit is opt-in');
+
+                T('popupFlow', { steps: ['2^3^2:c'] }, '512', 'AP569. :c stays on the local engine');
+                T('popupFlow', { steps: ['2(3+4):c'] }, '14', 'AP570. :c still accepts juxtaposition');
+                T('popupFlow', { steps: ['2+2:g'] }, 'Google calculator returned no result', 'AP571. :g asks Google and reports a miss without a browser permission');
+                T('popupFlow', { steps: ['2+2:w'] }, 'Add a Wolfram App ID in Options', 'AP572. :w asks for an App ID when none is saved');
 
                 T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
                 T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
@@ -634,6 +755,15 @@
                         calc.historyIndex = -1;
                         calc.variables = Object.assign({ '@': 0 }, test.savedVariables || {});
                         calc.cleanupVariables();
+                        if (Object.prototype.hasOwnProperty.call(test, 'resultDigits')) {
+                            calc.resultDigits = test.resultDigits;
+                        }
+                        if (Object.prototype.hasOwnProperty.call(test, 'onlineEngines')) {
+                            calc.onlineEngines = test.onlineEngines;
+                        }
+                        if (Object.prototype.hasOwnProperty.call(test, 'wolframAppId')) {
+                            calc.wolframAppId = test.wolframAppId;
+                        }
                         calc.calcInput = host.querySelector('#calcInput');
                         calc.calcResults = host.querySelector('#calcResults');
                         calc.calcResultsWrapper = host.querySelector('#calcResultsWrapper');

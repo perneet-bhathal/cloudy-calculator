@@ -6,6 +6,7 @@
  *   figures among the operands involved in that operation (metadata only; value uses full float).
  *
  * Values that are within IEEE noise of an integer are shown as integers (see snapNearIntegerFloat).
+ * ^ and ** are right-associative. Unary minus binds looser than power, so -2^2 is -(2^2).
  */
 (function (global) {
     'use strict';
@@ -104,7 +105,9 @@
     function parseAst(expr) {
         let e = stripGroupingCommas(expr).replace(/\s/g, '');
         e = e.replace(/[+\-*/^]+$/, '');
-        if (!e || /[a-zA-Z@]/.test(e)) return null;
+        // e/E are allowed so scientific notation (1e3, 2e-3) can be parsed.
+        // Any other letter is a name, which this parser does not handle.
+        if (!e || /[a-df-zA-DF-Z@]/.test(e)) return null;
 
         let pos = 0;
 
@@ -157,41 +160,44 @@
                 consume();
                 return inner;
             }
-            if (peek() === '-') {
-                consume();
-                const ch = parseFactor();
-                return { kind: 'neg', child: ch };
-            }
-            if (peek() === '+') {
-                consume();
-                return parseFactor();
-            }
             if (/[0-9.]/.test(peek())) {
                 return parseNumberNode();
             }
             throw new Error('factor');
         }
 
-        function parsePower() {
-            let left = parseFactor();
-            while (pos < e.length && e.substring(pos, pos + 2) === '**') {
-                pos += 2;
-                const right = parseFactor();
-                left = { kind: 'pow', left: left, right: right };
-            }
-            while (peek() === '^') {
+        // Unary +/- is below power: -2^2 = -(2^2), 2^-3^2 = 2^(-(3^2)).
+        function parseUnary() {
+            if (peek() === '-') {
                 consume();
-                const right = parseFactor();
-                left = { kind: 'pow', left: left, right: right };
+                return { kind: 'neg', child: parseUnary() };
+            }
+            if (peek() === '+') {
+                consume();
+                return parseUnary();
+            }
+            return parsePower();
+        }
+
+        // Right-associative so 2^3^2 = 2^(3^2).
+        function parsePower() {
+            const left = parseFactor();
+            if (pos < e.length && e.substring(pos, pos + 2) === '**') {
+                pos += 2;
+                return { kind: 'pow', left: left, right: parseUnary() };
+            }
+            if (peek() === '^') {
+                consume();
+                return { kind: 'pow', left: left, right: parseUnary() };
             }
             return left;
         }
 
         function parseTerm() {
-            let left = parsePower();
+            let left = parseUnary();
             while (peek() === '*' || peek() === '/') {
                 const op = consume();
-                const right = parsePower();
+                const right = parseUnary();
                 left = { kind: op === '*' ? 'mul' : 'div', left: left, right: right };
             }
             return left;
@@ -376,8 +382,11 @@
                 ast.kind === 'sub' ||
                 ast.kind === 'mul' ||
                 ast.kind === 'div' ||
-                ast.kind === 'pow'
+                ast.kind === 'pow' ||
+                ast.kind === 'neg'
             ) {
+                // neg is included so -2^-2 stays -0.25. A 1-sig-fig reading of the
+                // integer 2 would otherwise round that result to -0.3.
                 return { type: 'raw' };
             }
             if (ast.kind === 'lit') {
@@ -467,6 +476,24 @@
         return formatWithSpec(rawValue, spec);
     }
 
+    /**
+     * Round a computed value to `digits` significant figures (1–15).
+     * 15 uses the same full-precision cleanup as raw arithmetic display.
+     */
+    function formatToSignificantDigits(num, digits) {
+        if (typeof num !== 'number' || !isFinite(num)) return null;
+        const sig = Math.min(15, Math.max(1, Math.round(Number(digits))));
+        if (!(sig > 0)) return null;
+        if (sig >= 15) return formatRawArithmeticNumber(num);
+        const rounded = snapNearIntegerFloat(roundToSignificantFigures(num, sig));
+        if (Number.isInteger(rounded)) return String(rounded);
+        let s = rounded.toPrecision(sig);
+        if (s.indexOf('e') === -1 && s.indexOf('E') === -1) {
+            s = String(parseFloat(s));
+        }
+        return s;
+    }
+
     global.ArithmeticPrecision = {
         parseAst: parseAst,
         evalFull: evalFull,
@@ -478,6 +505,7 @@
         roundToSignificantFigures: roundToSignificantFigures,
         roundToDecimalPlaces: roundToDecimalPlaces,
         snapNearIntegerFloat: snapNearIntegerFloat,
-        formatWithSpec: formatWithSpec
+        formatWithSpec: formatWithSpec,
+        formatToSignificantDigits: formatToSignificantDigits
     };
 })(typeof window !== 'undefined' ? window : globalThis);

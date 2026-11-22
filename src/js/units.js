@@ -1019,7 +1019,31 @@ function snapConversionNearIntegerFloat(num) {
  * Simple "X unit to/in Y" conversion display: concise (about 2–4 fraction digits) for everyday magnitudes,
  * more digits when |value| &lt; 1 so small lengths/masses are not rounded away; huge/tiny → short scientific.
  */
+/** null when Options have not set a digit count (tests keep the short conversion format). */
+function configuredResultDigits() {
+    if (typeof window === 'undefined' || window.CLOUDY_RESULT_DIGITS == null || window.CLOUDY_RESULT_DIGITS === '') {
+        return null;
+    }
+    var n = Number(window.CLOUDY_RESULT_DIGITS);
+    if (!isFinite(n)) return null;
+    n = Math.round(n);
+    if (n < 1) return 1;
+    if (n > 15) return 15;
+    return n;
+}
+
+function formatToConfiguredDigits(num, digits) {
+    if (typeof ArithmeticPrecision !== 'undefined' &&
+        typeof ArithmeticPrecision.formatToSignificantDigits === 'function') {
+        var formatted = ArithmeticPrecision.formatToSignificantDigits(num, digits);
+        if (formatted !== null && formatted !== undefined) return formatted;
+    }
+    return formatRoundTripNumber(num);
+}
+
 function formatSimpleUnitConversionString(resultNum) {
+    var digits = configuredResultDigits();
+    if (digits !== null) return formatToConfiguredDigits(resultNum, digits);
     resultNum = snapConversionNearIntegerFloat(resultNum);
     if (!isFinite(resultNum)) return String(resultNum);
     if (Number.isInteger(resultNum)) return String(resultNum);
@@ -1056,6 +1080,8 @@ function formatMixedUnitNumericOutput(num, highPrecisionChain) {
 /** Temperature conversions need two decimal places (e.g. 373.15 K); formatNumber may pick one decimal (373.2). */
 function formatTemperatureResult(num) {
     if (typeof num !== 'number' || !isFinite(num)) return String(num);
+    var digits = configuredResultDigits();
+    if (digits !== null) return formatToConfiguredDigits(num, digits);
     num = snapNearIntegerFloat(num);
     if (Number.isInteger(num)) return String(num);
     var s = num.toFixed(2);
@@ -1862,10 +1888,12 @@ function unitsJsCalc(input) {
             if (/log/i.test(m)) return 'Math.log10'; // base10 per earlier definition
             return 'Math.'+m.toLowerCase();
         });
-        var evalResult = Function('return (' + expr + ')')();
-        if (!isNaN(evalResult)) {
-            return formatNumber(evalResult);
-        }
+        try {
+            var evalResult = Function('return (' + expr + ')')();
+            if (typeof evalResult === 'number' && isFinite(evalResult)) {
+                return formatNumber(evalResult);
+            }
+        } catch (err) {}
     }
     
     return null;
@@ -2073,12 +2101,12 @@ function processMixedUnits(input, highPrecisionChain) {
                     unitToUse = firstUnit.trim();
                 } else {
                     // Fallback: return in base unit if conversion fails
-                    formattedNum = String(totalBaseValue.toFixed(6));
+                    formattedNum = formatMixedUnitNumericOutput(totalBaseValue, highPrecisionChain);
                     unitToUse = (firstBaseValue && firstBaseValue.unit) ? firstBaseValue.unit : 'm';
                 }
             } else {
                 // Fallback: return in base unit
-                formattedNum = String(totalBaseValue.toFixed(6));
+                formattedNum = formatMixedUnitNumericOutput(totalBaseValue, highPrecisionChain);
                 unitToUse = (firstBaseValue && firstBaseValue.unit) ? firstBaseValue.unit : 'm';
             }
             
@@ -2270,12 +2298,11 @@ function processMixedUnits(input, highPrecisionChain) {
                 unitToUse = firstOriginalUnit.trim();
             } else {
                 // Fallback: use base unit
-                formattedNum = String(cleanedResult.toFixed(Math.min(displayPrecision, 6)));
+                formattedNum = formatMixedUnitNumericOutput(cleanedResult, highPrecisionChain);
                 unitToUse = (resultUnit && resultUnit.trim().length > 0) ? resultUnit : 'm';
             }
         } else {
-            // Fallback: Format the result using the first value's precision in base unit
-            formattedNum = String(cleanedResult.toFixed(Math.min(displayPrecision, 6)));
+            formattedNum = formatMixedUnitNumericOutput(cleanedResult, highPrecisionChain);
             unitToUse = (resultUnit && resultUnit.trim().length > 0) ? resultUnit : 'm';
         }
         

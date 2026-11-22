@@ -33,6 +33,21 @@ This document is the **canonical** spec for how pure arithmetic and related resu
 
 ---
 
+## Result digits
+
+Options → **Result digits**.
+
+- **`full`** (default): built-in display. Pure arithmetic uses the raw full-double cleanup above. Bare `pi` stays **3.14**. Unit conversions stay on the short conversion format.
+- **`1`–`15`**: force that many significant digits on the full value. **`15`** is full double precision, including `pi` and unit conversions. This is the control when a result looks too short.
+
+## Operator precedence
+
+`^` and `**` are **right-associative** (`2^3^2` = `2^(3^2)` = 512). Unary minus binds looser than power (`-2^2` = -4). `*` and `/` still bind tighter than `+` and `-`. `2pi` and `2(3+4)` are multiplication.
+
+## Online engines
+
+Options → **Online engines**. **Fallback** (default) asks Google Calculator, then Wolfram Alpha, only when local evaluation fails. **Prefer** tries them first. Suffixes on an entry: `:g` Google, `:w` Wolfram, `:c` local only. Wolfram uses App ID `P8EHXTA2KJ` until Options replaces or clears it. Google does not need a key.
+
 ## Cursor / IDE
 
 `.cursor/rules/calculator-display-precision.mdc` points here so assistants open this file; the **content** in this markdown file is the source of truth.

@@ -136,6 +136,10 @@ class CloudyCalculator {
         this.history = [];
         this.historyIndex = -1;
         this.variables = { '@': 0 }; // @ is the last result
+        this.resultDigits = null; // null = built-in display; 1–15 forces significant digits
+        this.onlineEngines = 'fallback'; // off | fallback | prefer
+        this.wolframAppId = 'P8EHXTA2KJ';
+        this._onlineTried = false;
         // this.aiResolver = new AIErrorResolver();
         this.init();
     }
@@ -345,8 +349,18 @@ class CloudyCalculator {
     async loadAndApplyOptions() {
         try {
             const options = await chrome.storage.local.get([
-                'zoom', 'height', 'width', 'titleFont', 'headerLinksFont', 'resultFont', 'inputFont'
+                'zoom', 'height', 'width', 'titleFont', 'headerLinksFont', 'resultFont', 'inputFont',
+                'resultDigits', 'onlineEngines', 'wolframAppId'
             ]);
+            this.resultDigits = this.normalizeResultDigits(options.resultDigits);
+            this.onlineEngines = this.normalizeOnlineEngines(options.onlineEngines);
+            // A saved empty string turns Wolfram off. A missing key keeps the built-in App ID.
+            this.wolframAppId = Object.prototype.hasOwnProperty.call(options, 'wolframAppId')
+                ? String(options.wolframAppId || '')
+                : 'P8EHXTA2KJ';
+            if (typeof window !== 'undefined') {
+                window.CLOUDY_RESULT_DIGITS = this.resultDigits;
+            }
             
             // ===== Apply size options (width & height) =====
             const calcWrapper = document.getElementById('calcWrapper');
@@ -525,10 +539,16 @@ class CloudyCalculator {
     }
 
     async processInput() {
-        const input = this.calcInput.value.trim();
+        const typed = this.calcInput.value.trim();
+        if (!typed) return;
+
+        const route = this.splitEngineSuffix(typed);
+        let input = route.input;
+        const forced = route.forced;
         if (!input) return;
 
-        this.addToHistory(input);
+        this._onlineTried = false;
+        this.addToHistory(typed);
 
         try {
             if (input === 'clear') {
@@ -539,6 +559,23 @@ class CloudyCalculator {
                 return;
             }
 
+            if (forced === 'google' || forced === 'wolfram') {
+                const online = await this.askOnline(input, forced);
+                if (online) {
+                    this.showOnlineResult(input, online);
+                } else {
+                    const hint = forced === 'wolfram' && !String(this.wolframAppId || '').trim()
+                        ? 'Add a Wolfram App ID in Options'
+                        : (forced === 'google'
+                            ? 'Google calculator returned no result'
+                            : 'Wolfram Alpha returned no result');
+                    this.addResult(input, hint, 'error');
+                }
+                this.calcInput.value = '';
+                this.focusInput();
+                return;
+            }
+
             // Handle variable assignments first
             if (await this.handleVariableAssignment(input)) {
                 this.limitVariables();
@@ -546,6 +583,17 @@ class CloudyCalculator {
                 this.calcInput.value = '';
                 this.focusInput(); // Ensure focus is maintained
                 return;
+            }
+
+            const isAssignment = /^(@?\w+)\s*=\s*.+$/.test(input);
+            if (this.onlineEngines === 'prefer' && forced !== 'local' && !isAssignment) {
+                const online = await this.askOnline(input, 'auto');
+                if (online) {
+                    this.showOnlineResult(input, online);
+                    this.calcInput.value = '';
+                    this.focusInput();
+                    return;
+                }
             }
 
             // Check if this looks like a natural language question that needs AI
@@ -617,6 +665,15 @@ class CloudyCalculator {
             this.saveState();
 
         } catch (error) {
+            if (forced !== 'local' && this.onlineEngines !== 'off' && !this._onlineTried) {
+                const online = await this.askOnline(input, 'auto');
+                if (online) {
+                    this.showOnlineResult(input, online);
+                    this.calcInput.value = '';
+                    this.focusInput();
+                    return;
+                }
+            }
             // If we get here, both unit conversion and main parser failed
             let errorMessage = 'Error: ' + error.message;
             
@@ -756,8 +813,93 @@ class CloudyCalculator {
     //     return hasNaturalLanguage && (wordCount >= 3 || !hasMathOperators);
     // }
 
+    normalizeResultDigits(value) {
+        if (value == null || value === '' || String(value).trim().toLowerCase() === 'full') return null;
+        const n = Math.round(Number(value));
+        if (!isFinite(n)) return null;
+        if (n < 1) return 1;
+        if (n > 15) return 15;
+        return n;
+    }
+
+    normalizeOnlineEngines(value) {
+        const mode = String(value || '').trim().toLowerCase();
+        if (mode === 'off' || mode === 'prefer' || mode === 'fallback') return mode;
+        return 'fallback';
+    }
+
+    /**
+     * Trailing :g Google, :w Wolfram, :c local only. The suffix is not part of the expression.
+     */
+    splitEngineSuffix(typed) {
+        const match = String(typed).match(/^(.*?):\s*([gcw])\s*$/i);
+        if (!match) return { input: String(typed).trim(), forced: null };
+        const code = match[2].toLowerCase();
+        const forced = code === 'g' ? 'google' : code === 'w' ? 'wolfram' : 'local';
+        return { input: match[1].trim(), forced: forced };
+    }
+
+    /**
+     * 2pi, 2(3+4), (2)(3) → explicit multiplication. Leaves scientific notation (1e3, 2e-1) alone.
+     */
+    insertImplicitMultiplication(expression) {
+        let expr = String(expression);
+        expr = expr.replace(/(\d)\s*\(/g, '$1*(');
+        expr = expr.replace(/\)\s*\(/g, ')*(');
+        expr = expr.replace(/\)\s*(\d)/g, ')*$1');
+        expr = expr.replace(/(\d)\s*(pi)\b/gi, '$1*$2');
+        expr = expr.replace(/\)\s*(pi)\b/gi, ')*$1');
+        expr = expr.replace(/\b(pi)\s*(\d)/gi, '$1*$2');
+        expr = expr.replace(/\b(pi)\s*\(/gi, '$1*(');
+        expr = expr.replace(/(\d)\s*(e)(?![+\-]?\d)/gi, '$1*$2');
+        expr = expr.replace(/\)\s*(e)(?![+\-]?\d)/gi, ')*$1');
+        expr = expr.replace(/\b(e)\s*(\d)/gi, '$1*$2');
+        expr = expr.replace(/\b(e)\s*\(/gi, '$1*(');
+        return expr;
+    }
+
+    canUseOnlineMessaging() {
+        return typeof chrome !== 'undefined' &&
+            chrome.runtime &&
+            chrome.runtime.id &&
+            typeof chrome.runtime.sendMessage === 'function';
+    }
+
+    askOnline(query, engine) {
+        this._onlineTried = true;
+        if (!query || !this.canUseOnlineMessaging()) return Promise.resolve(null);
+        if (engine === 'wolfram' && !String(this.wolframAppId || '').trim()) return Promise.resolve(null);
+        return new Promise((resolve) => {
+            let settled = false;
+            const finish = (value) => {
+                if (settled) return;
+                settled = true;
+                resolve(value);
+            };
+            const timer = setTimeout(() => finish(null), 8000);
+            try {
+                chrome.runtime.sendMessage({ type: 'onlineCalc', engine: engine, query: query }, (response) => {
+                    clearTimeout(timer);
+                    const failed = chrome.runtime.lastError || !response || response.output == null || response.output === '';
+                    if (failed) finish(null);
+                    else finish({ output: String(response.output), source: response.source || engine });
+                });
+            } catch (e) {
+                clearTimeout(timer);
+                finish(null);
+            }
+        });
+    }
+
+    showOnlineResult(input, online) {
+        this.addResult(input, online.output, 'online', null, online.source);
+        const n = this.parseNumericFromResult(online.output);
+        this.variables['@'] = (typeof n === 'number' && isFinite(n)) ? popupSnapNearIntegerFloat(n) : 0;
+        this.saveState();
+    }
+
     substituteVariables(expression) {
-        let expr = expression;
+        let expr = this.insertImplicitMultiplication(expression);
 
         // Substitute the special '@' variable first (word boundaries don't match '@')
         const atRaw = this.variables['@'];
@@ -903,12 +1045,6 @@ class CloudyCalculator {
                 }
                 consume(); // consume ')'
                 return result;
-            } else if (peek() === '-') {
-                consume(); // unary minus
-                return -parseFactor();
-            } else if (peek() === '+') {
-                consume(); // unary plus
-                return parseFactor();
             } else if (/[0-9.]/.test(peek())) {
                 return parseNumber();
             } else if (/[a-zA-Z]/.test(peek())) {
@@ -918,25 +1054,37 @@ class CloudyCalculator {
             }
         }
 
+        // Unary +/- is below power: -2^2 = -(2^2). The right-hand side of ^ is parseUnary, so ^ is right-associative.
+        function parseUnary() {
+            if (peek() === '-') {
+                consume();
+                return -parseUnary();
+            }
+            if (peek() === '+') {
+                consume();
+                return parseUnary();
+            }
+            return parsePower();
+        }
+
         function parsePower() {
-            let result = parseFactor();
-            while (pos < expr.length && expr.substring(pos, pos + 2) === '**') {
-                pos += 2; // skip '**'
-                result = Math.pow(result, parseFactor());
+            const base = parseFactor();
+            if (pos < expr.length && expr.substring(pos, pos + 2) === '**') {
+                pos += 2;
+                return Math.pow(base, parseUnary());
             }
-            // Handle ^ as well
-            while (pos < expr.length && peek() === '^') {
-                consume(); // skip '^'
-                result = Math.pow(result, parseFactor());
+            if (peek() === '^') {
+                consume();
+                return Math.pow(base, parseUnary());
             }
-            return result;
+            return base;
         }
 
         function parseTerm() {
-            let result = parsePower();
+            let result = parseUnary();
             while (pos < expr.length && /[*/]/.test(peek())) {
                 const op = consume();
-                const right = parsePower();
+                const right = parseUnary();
                 if (op === '*') {
                     result *= right;
                 } else {
@@ -961,6 +1109,11 @@ class CloudyCalculator {
             }
             return result;
         }
+
+        // Juxtaposition (2pi, 2(3+4)) then a second constant pass in case this string skipped substituteVariables.
+        expr = this.insertImplicitMultiplication(expr);
+        expr = expr.replace(/\bpi\b/gi, String(Math.PI));
+        expr = expr.replace(/\be\b/gi, String(Math.E));
 
         // Handle degrees conversion before parsing
         expr = expr.replace(/(\d+(?:\.\d+)?)degrees?/g, '($1*' + (Math.PI / 180) + ')');
@@ -1010,6 +1163,16 @@ class CloudyCalculator {
             return num;
         }
 
+        const forcedDigits = this.normalizeResultDigits(this.resultDigits);
+        if (
+            forcedDigits != null &&
+            typeof ArithmeticPrecision !== 'undefined' &&
+            typeof ArithmeticPrecision.formatToSignificantDigits === 'function'
+        ) {
+            const forced = ArithmeticPrecision.formatToSignificantDigits(num, forcedDigits);
+            if (forced !== null && forced !== undefined) return forced;
+        }
+
         const maxDecimalPlaces = 15;
 
         if (
@@ -1044,7 +1207,7 @@ class CloudyCalculator {
         return String(num);
     }
 
-    addResult(input, result, type = 'normal', precisionSourceInput = null) {
+    addResult(input, result, type = 'normal', precisionSourceInput = null, onlineSource = null) {
         const li = document.createElement('li');
         li.className = 'result-item';
         
@@ -1052,10 +1215,13 @@ class CloudyCalculator {
         inputSpan.className = 'inputText';
         inputSpan.textContent = `${input} =`;
         
-        // Format the result to remove floating-point artifacts
+        // Format the result to remove floating-point artifacts.
+        // Online engine text is shown as returned so a later digit cap cannot shorten it.
         const formatSpec = this.getDisplayFormatSpec(precisionSourceInput || input);
         let displayResult = result;
-        if (typeof result === 'number' && isFinite(result)) {
+        if (type === 'online') {
+            displayResult = String(result);
+        } else if (typeof result === 'number' && isFinite(result)) {
             displayResult = this.formatNumber(result, formatSpec);
         } else if (typeof result === 'string') {
             // Check if result contains a unit (e.g., "3.42 ft", "5 kg")
@@ -1095,6 +1261,12 @@ class CloudyCalculator {
         resultSpan.textContent = displayResult;
         resultSpan.style.cursor = 'pointer';
         resultSpan.dataset.value = displayResult;
+        if (onlineSource) {
+            const tag = document.createElement('span');
+            tag.className = 'result-source';
+            tag.textContent = onlineSource === 'wolfram' ? ' Wolfram' : ' Google';
+            resultSpan.appendChild(tag);
+        }
         
         li.appendChild(inputSpan);
         li.appendChild(resultSpan);
