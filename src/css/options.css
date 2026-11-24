@@ -1,46 +1,94 @@
 /*** global ***/
 body {
 	font-family: arial, sans-serif;
+	line-height: 1.4;
+	margin: 16px 20px 28px;
+	background: #fff;
+	color: #1a1a1a;
+	color-scheme: light;
 }
 
 h1 {
 	text-align: center;
+	margin: 8px 0 4px;
 }
 
 input[type="text"] {
-	width: 125px;
-	padding-left: 3px;
+	width: 180px;
+	padding: 3px 6px;
+	box-sizing: border-box;
 }
 
 table {
-	margin: auto;
-	margin-top: 10px;
-	position: relative;
+	margin: 8px auto 0;
+	border-collapse: separate;
+	border-spacing: 0 2px;
 }
+
 th {
 	font-size: 120%;
-	padding: 15px 0px 5px 0px;
+	padding: 18px 0 6px;
 	text-align: left;
+	line-height: 1.3;
+}
+
+td {
+	padding: 4px 12px 4px 0;
+	vertical-align: middle;
+	line-height: 1.4;
+}
+
+td[colspan="3"] {
+	padding-top: 2px;
+	padding-bottom: 6px;
+}
+
+label {
+	line-height: 1.4;
+}
+
+input[type="checkbox"] {
+	margin: 0 6px 0 0;
+	vertical-align: middle;
 }
 
 .fullInput {
-	padding-left: 23px;
+	padding-left: 22px;
+	margin-top: 6px;
 }
 
 .optionInfo {
-	font-size: 80%;
-	margin-bottom: 8px;
-	margin-top: -8px;
-	opacity: .8;
-	position: relative;
-	width: 230px;
-}
-.subInfo {
-	margin-left:15px;
-	margin-top:-2px;
-	margin-bottom: 0px;
+	font-size: 13px;
+	line-height: 1.45;
+	margin: 6px 0 2px;
+	opacity: .85;
+	max-width: 460px;
 }
 
-#localGoogleUrl {
-	width: 100%;
+.subInfo {
+	margin-left: 15px;
+	margin-top: 2px;
+	margin-bottom: 0;
+	line-height: 1.45;
+}
+
+label[for="wolframAppId"] {
+	display: block;
+	margin-bottom: 4px;
+}
+
+label[for="wolframAppId"] + .fullInput {
+	padding-left: 0;
+	margin-top: 0;
+	width: 280px;
+}
+
+#localGoogleUrl,
+label[for="wolframAppId"] + .fullInput #wolframAppId {
+	width: 280px;
+}
+
+select {
+	width: 180px;
+	padding: 2px 4px;
 }
