@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="UTF-8">
     <title>Cloudy Calculator - Comprehensive Test Suite</title>
     <style>
         body { font-family: Arial, sans-serif; margin: 20px; }
@@ -715,6 +716,140 @@
                 T('popupFlow', { steps: ['2+2:g'] }, 'Google calculator returned no result', 'AP571. :g asks Google and reports a miss without a browser permission');
                 T('popupFlow', { steps: ['2+2:w'] }, 'Add a Wolfram App ID in Options', 'AP572. :w asks for an App ID when none is saved');
 
+                // Currency symbols in arithmetic. Rates are frozen to the built-in table
+                // (1 USD = X) so mixed-currency cases do not follow a live API refresh.
+                T('popupFlow', { steps: ['£122 + 2'], freezeRates: true }, '£124.00', 'CUR01. £122 + 2 keeps the pound and two decimals');
+                T('popupFlow', { steps: ['£122 + £2'], freezeRates: true }, '£124.00', 'CUR02. £122 + £2');
+                T('popupFlow', { steps: ['£122+£2'], freezeRates: true }, '£124.00', 'CUR03. no spaces');
+                T('popupFlow', { steps: ['£ 122 + £ 2'], freezeRates: true }, '£124.00', 'CUR04. spaces around the symbol');
+                T('popupFlow', { steps: ['122£ + 2£'], freezeRates: true }, '£124.00', 'CUR05. symbol after the number');
+                T('popupFlow', { steps: ['122 £ + 2'], freezeRates: true }, '£124.00', 'CUR06. spaced suffix symbol');
+                T('popupFlow', { steps: ['£122.5 + £1.5'], freezeRates: true }, '£124.00', 'CUR07. halves still show .00');
+                T('popupFlow', { steps: ['£1,222 + £2'], freezeRates: true }, '£1224.00', 'CUR08. commas in a pasted price are grouping');
+                T('popupFlow', { steps: ['£122 + £2 ='], freezeRates: true }, '£124.00', 'CUR09. trailing equals is ignored');
+                T('popupFlow', { steps: ['£122'], freezeRates: true }, '£122.00', 'CUR10. a single price');
+                T('popupFlow', { steps: ['£10 * 3'], freezeRates: true }, '£30.00', 'CUR11. multiply by a plain number');
+                T('popupFlow', { steps: ['£10 / 4'], freezeRates: true }, '£2.50', 'CUR12. division shows cents');
+                T('popupFlow', { steps: ['£10 / 3'], freezeRates: true }, '£3.33', 'CUR13. money rounds to the minor unit');
+                T('popupFlow', { steps: ['(£100 + £20) * 2'], freezeRates: true }, '£240.00', 'CUR14. parentheses');
+                T('popupFlow', { steps: ['£2 + £3 * £4'], freezeRates: true }, '£14.00', 'CUR15. multiply before add');
+                T('popupFlow', { steps: ['£2 ^ 3'], freezeRates: true }, '£8.00', 'CUR16. power');
+                T('popupFlow', { steps: ['£10(2)'], freezeRates: true }, '£20.00', 'CUR17. juxtaposition after a price');
+                T('popupFlow', { steps: ['£1e3 + £2'], freezeRates: true }, '£1002.00', 'CUR18. scientific notation stays a number');
+                T('popupFlow', { steps: ['£1.5e2 + 2'], freezeRates: true }, '£152.00', 'CUR19. decimal mantissa');
+                T('popupFlow', { steps: ['£0.1 + £0.2'], freezeRates: true }, '£0.30', 'CUR20. binary float noise rounds to cents');
+                T('popupFlow', { steps: ['£5 - £8'], freezeRates: true }, '-£3.00', 'CUR21. negative money');
+                T('popupFlow', { steps: ['£-5 + £8'], freezeRates: true }, '£3.00', 'CUR22. sign between symbol and digits');
+                T('popupFlow', { steps: ['-£5 + £8'], freezeRates: true }, '£3.00', 'CUR23. leading minus on the first price');
+                T('popupFlow', { steps: ['10 + £2'], freezeRates: true }, '£12.00', 'CUR24. a plain number is already in that currency');
+                T('popupFlow', { steps: ['£10 + £2 + 3'], freezeRates: true }, '£15.00', 'CUR25. several plain and tagged amounts');
+                T('popupFlow', { steps: ['sqrt(£16)'], freezeRates: true }, '£4.00', 'CUR26. currency inside a function');
+                T('popupFlow', { steps: ['abs(-£5)'], freezeRates: true }, '£5.00', 'CUR27. abs of a negative price');
+                T('popupFlow', { steps: ['£10 / 4'], freezeRates: true, resultDigits: 1 }, '£2.50', 'CUR28. result digits do not strip cents');
+                T('popupFlow', { steps: ['122 + 2'], freezeRates: true }, '124', 'CUR29. plain arithmetic stays plain');
+                T('popupFlow', { steps: ['floor(10)'], freezeRates: true }, '10', 'CUR30. floor is still a function, not forint');
+                T('popupFlow', { steps: ['round(1.2)'], freezeRates: true }, '1', 'CUR31. round is still a function');
+
+                T('popupFlow', { steps: ['$10 + $2.5'], freezeRates: true }, '$12.50', 'CUR32. dollars');
+                T('popupFlow', { steps: ['US$10 + $2'], freezeRates: true }, 'US$12.00', 'CUR33. the first symbol is the one shown');
+                T('popupFlow', { steps: ['€10 + 0.1'], freezeRates: true }, '€10.10', 'CUR34. euros');
+                T('popupFlow', { steps: ['10€ + 2€'], freezeRates: true }, '€12.00', 'CUR35. euro suffix');
+                T('popupFlow', { steps: ['¥100 + ¥5'], freezeRates: true }, '¥105', 'CUR36. yen has no minor unit');
+                T('popupFlow', { steps: ['¥100 + 5'], freezeRates: true }, '¥105', 'CUR37. yen plus a plain number');
+                T('popupFlow', { steps: ['₩1000 + ₩200'], freezeRates: true }, '₩1200', 'CUR38. won has no minor unit');
+                T('popupFlow', { steps: ['₫1500 + 250'], freezeRates: true }, '₫1750', 'CUR39. dong has no minor unit');
+                T('popupFlow', { steps: ['₹100 + ₹0.5'], freezeRates: true }, '₹100.50', 'CUR40. rupee, same currency needs no rate');
+                T('popupFlow', { steps: ['₽10.1 + ₽0.2'], freezeRates: true }, '₽10.30', 'CUR41. ruble cents');
+                T('popupFlow', { steps: ['R$10 + R$1.5'], freezeRates: true }, 'R$11.50', 'CUR42. real');
+                T('popupFlow', { steps: ['A$10 + 2'], freezeRates: true }, 'A$12.00', 'CUR43. Australian dollar prefix');
+                T('popupFlow', { steps: ['AU$10 + A$2'], freezeRates: true }, 'AU$12.00', 'CUR44. AU$ and A$ are both AUD');
+                T('popupFlow', { steps: ['HK$10 + HK$0.5'], freezeRates: true }, 'HK$10.50', 'CUR45. HK$ is not USD');
+                T('popupFlow', { steps: ['CA$10 + C$2'], freezeRates: true }, 'CA$12.00', 'CUR46. CA$ and C$ are both CAD');
+                T('popupFlow', { steps: ['Fr10 + Fr2.5'], freezeRates: true }, 'Fr12.50', 'CUR47. franc symbol');
+                T('popupFlow', { steps: ['zł10 + 2'], freezeRates: true }, 'zł12.00', 'CUR48. zloty');
+                T('popupFlow', { steps: ['₺10 + ₺2.25'], freezeRates: true }, '₺12.25', 'CUR49. lira');
+                T('popupFlow', { steps: ['₱100 + ₱0.5'], freezeRates: true }, '₱100.50', 'CUR50. peso sign');
+                T('popupFlow', { steps: ['元10 + 元2'], freezeRates: true }, '元12.00', 'CUR51. yuan character');
+                T('popupFlow', { steps: ['د.ك1.2 + د.ك1'], freezeRates: true }, 'د.ك2.200', 'CUR52. dinar uses three decimals');
+
+                T('popupFlow', { steps: ['£100 + $10'], freezeRates: true }, '£107.30', 'CUR53. dollars added to pounds use the rate table');
+                T('popupFlow', { steps: ['$10 + £100'], freezeRates: true }, '$146.99', 'CUR54. pounds added to dollars');
+                T('popupFlow', { steps: ['€10 + £10'], freezeRates: true }, '€21.64', 'CUR55. pounds into euros');
+                T('popupFlow', { steps: ['£10 + €10'], freezeRates: true }, '£18.59', 'CUR56. euros into pounds');
+                T('popupFlow', { steps: ['£1 + $1'], freezeRates: true }, '£1.73', 'CUR57. one dollar in pounds');
+                T('popupFlow', { steps: ['€1 + $1'], freezeRates: true }, '€1.85', 'CUR58. one dollar in euros');
+                T('popupFlow', { steps: ['¥110 + $1'], freezeRates: true }, '¥220', 'CUR59. one dollar in yen');
+                T('popupFlow', { steps: ['₽90 + $1'], freezeRates: true }, '₽180.00', 'CUR60. one dollar in rubles');
+                T('popupFlow', { steps: ['C$5 + $4'], freezeRates: true }, 'C$10.00', 'CUR61. four dollars is five Canadian dollars');
+                T('popupFlow', { steps: ['A$1 + $1'], freezeRates: true }, 'A$2.35', 'CUR62. one dollar in Australian dollars');
+                T('popupFlow', { steps: ['Mex$17 + $1'], freezeRates: true }, 'Mex$34.00', 'CUR63. Mex$ is matched whole, then converted');
+                T('popupFlow', { steps: ['Fr10 + $10'], freezeRates: true }, 'Fr19.20', 'CUR64. dollars into francs');
+                T('popupFlow', { steps: ['元1 + $1'], freezeRates: true }, '元7.45', 'CUR65. one dollar in yuan');
+                T('popupFlow', { steps: ['£100 - $10'], freezeRates: true }, '£92.70', 'CUR66. subtract a converted amount');
+                T('popupFlow', { steps: ['£10 / $2'], freezeRates: true }, '£6.85', 'CUR67. divide by a converted amount');
+                T('popupFlow', { steps: ['$5 * £2'], freezeRates: true }, '$13.70', 'CUR68. multiply after converting the second price');
+                T('popupFlow', { steps: ['(£10 + $10) * 2'], freezeRates: true }, '£34.60', 'CUR69. convert, then use normal precedence');
+                T('popupFlow', { steps: ['£2 + $3 * €4'], freezeRates: true }, '£9.52', 'CUR70. three currencies, multiply before add');
+                T('popupFlow', { steps: ['£10 + $10 + €10'], freezeRates: true }, '£25.89', 'CUR71. three currencies added');
+                T('popupFlow', { steps: ['10£ + $2'], freezeRates: true }, '£11.46', 'CUR72. suffix pound plus dollars');
+
+                T('popupFlow', { steps: ['£122 + 2', '+2'], freezeRates: true }, '£126.00', 'CUR73. +2 continues in the same currency');
+                T('popupFlow', { steps: ['£100', '+ $10'], freezeRates: true }, '£107.30', 'CUR74. continuation converts the new symbol');
+                T('popupFlow', { steps: ['50', '+ £2'], freezeRates: true }, '£52.00', 'CUR75. a plain result plus a price');
+                T('popupFlow', { steps: ['£10', '*3'], freezeRates: true }, '£30.00', 'CUR76. *3 continues in pounds');
+                T('popupFlow', { steps: ['£10 / 3', '*3'], freezeRates: true }, '£9.99', 'CUR77. continuation uses the rounded cents');
+                T('popupFlow', { steps: ['x = £10 + £2'], freezeRates: true }, 'x = £12.00', 'CUR78. assignment shows the currency');
+                T('popupFlow', { steps: ['x = £10 + £2', 'x + £1'], freezeRates: true }, '£13.00', 'CUR79. a saved price adds as a number');
+                T('popupFlow', { steps: ['x = £10 + £2', '+2'], freezeRates: true }, '£14.00', 'CUR80. +2 after an assignment keeps the symbol');
+
+                T('popupFlow', { steps: ['£1 + ₹1'], freezeRates: true, onlineEngines: 'off' }, 'Error: No exchange rate for INR', 'CUR81. mixed currency without a rate is an error');
+                T('popupFlow', { steps: ['§5+1'], freezeRates: true, onlineEngines: 'off' }, 'Error: Expected number, function, or parenthesized expression', 'CUR82. an unknown sign is still a syntax error');
+                T('popupFlow', { steps: ['£'], freezeRates: true, onlineEngines: 'off' }, 'Error: Expected number, function, or parenthesized expression', 'CUR83. a bare symbol is not a number');
+                T('popupFlow', { steps: ['£5 / £0'], freezeRates: true, onlineEngines: 'off' }, 'Error: Division by zero', 'CUR84. currency does not hide division by zero');
+
+                if (window.CLOUDY_CURRENCY_SYMBOLS) {
+                    window.CLOUDY_CURRENCY_SYMBOLS.forEach((cur) => {
+                        const expr = cur.symbol + '10+' + cur.symbol + '2';
+                        const expected = cur.symbol + (12).toFixed(cur.decimals);
+                        T('popupFlow', { steps: [expr], freezeRates: true }, expected, 'CUR-SYM ' + cur.code + ' ' + expr);
+                    });
+                }
+
+                T('popupFlow', { steps: ['1536'] }, '1536', 'GRP01. thousands separators stay off by default');
+                T('popupFlow', { steps: ['1536'], groupDigits: true }, '1,536', 'GRP02. 1536 displays as 1,536');
+                T('popupFlow', { steps: ['1000+536'], groupDigits: true }, '1,536', 'GRP03. a sum in the thousands');
+                T('popupFlow', { steps: ['999'], groupDigits: true }, '999', 'GRP04. no comma below 1,000');
+                T('popupFlow', { steps: ['999+1'], groupDigits: true }, '1,000', 'GRP05. crossing 1,000 gains a comma');
+                T('popupFlow', { steps: ['1000000'], groupDigits: true }, '1,000,000', 'GRP06. millions');
+                T('popupFlow', { steps: ['1234567890'], groupDigits: true }, '1,234,567,890', 'GRP07. billions of digits grouped by three');
+                T('popupFlow', { steps: ['2^20'], groupDigits: true }, '1,048,576', 'GRP08. a power result');
+                T('popupFlow', { steps: ['-1536'], groupDigits: true }, '-1,536', 'GRP09. negative thousands');
+                T('popupFlow', { steps: ['-1234567.5'], groupDigits: true }, '-1,234,567.5', 'GRP10. the sign stays in front of the commas');
+                T('popupFlow', { steps: ['1234567.5+0'], groupDigits: true }, '1,234,567.5', 'GRP11. decimals are not grouped');
+                T('popupFlow', { steps: ['1536.5'], groupDigits: true }, '1,536.5', 'GRP12. a single decimal place is kept');
+                T('popupFlow', { steps: ['1536.50'], groupDigits: true }, '1,536.5', 'GRP13. plain numbers still trim a trailing zero');
+                T('popupFlow', { steps: ['0'], groupDigits: true }, '0', 'GRP14. zero');
+                T('popupFlow', { steps: ['12.5'], groupDigits: true }, '12.5', 'GRP15. small decimals gain no comma');
+                T('popupFlow', { steps: ['1e6'], groupDigits: true }, '1,000,000', 'GRP16. 1e6 displays grouped, not in scientific form');
+                T('popupFlow', { steps: ['1e21'], groupDigits: true }, '1e+21', 'GRP17. a scientific result does not gain commas in the exponent');
+                T('popupFlow', { steps: ['1,536+1'], groupDigits: true }, '1,537', 'GRP18. input commas and output commas together');
+                T('popupFlow', { steps: ['1000+500', '+36'], groupDigits: true }, '1,536', 'GRP19. continuation parses the grouped result');
+                T('popupFlow', { steps: ['1,000+500', '+36'], groupDigits: true }, '1,536', 'GRP20. grouped input then grouped continuation');
+                T('popupFlow', { steps: ['1234567*1'], groupDigits: true, resultDigits: 4 }, '1,235,000', 'GRP21. significant digits, then separators');
+                T('popupFlow', { steps: ['pi'], groupDigits: true }, '3.14', 'GRP22. pi is unchanged');
+                T('popupFlow', { steps: ['1000*12'], groupDigits: true }, '12,000', 'GRP23. multiplication into the thousands');
+
+                T('popupFlow', { steps: ['£1536 + £0.5'], groupDigits: true, freezeRates: true }, '£1,536.50', 'GRP24. currency cents keep their zeros and gain a comma');
+                T('popupFlow', { steps: ['£1536.50'], groupDigits: true, freezeRates: true }, '£1,536.50', 'GRP25. 1536.50 with a symbol displays as £1,536.50');
+                T('popupFlow', { steps: ['£1536 + 2'], freezeRates: true }, '£1538.00', 'GRP26. currency without the option has no comma');
+                T('popupFlow', { steps: ['£1,000 + £500', '+ £36.5'], groupDigits: true, freezeRates: true }, '£1,536.50', 'GRP27. grouped currency continuation');
+                T('popupFlow', { steps: ['-£1536.5'], groupDigits: true, freezeRates: true }, '-£1,536.50', 'GRP28. negative currency');
+                T('popupFlow', { steps: ['¥1536 + ¥0'], groupDigits: true, freezeRates: true }, '¥1,536', 'GRP29. yen stays a whole number when grouped');
+                T('popupFlow', { steps: ['₩1536 + 0'], groupDigits: true, freezeRates: true }, '₩1,536', 'GRP30. won grouped');
+                T('popupFlow', { steps: ['₫1536 + 250'], groupDigits: true, freezeRates: true }, '₫1,786', 'GRP31. dong grouped');
+                T('popupFlow', { steps: ['£1000000.5'], groupDigits: true, freezeRates: true }, '£1,000,000.50', 'GRP32. millions of pounds');
+                T('popupFlow', { steps: ['£999 + £1'], groupDigits: true, freezeRates: true }, '£1,000.00', 'GRP33. currency crossing one thousand');
+
                 T('sf', { literal: '123.00' }, 5, 'AP406. countSigFigs: trailing zeros after . count');
                 T('sf', { literal: '0.0123' }, 3, 'AP407. countSigFigs: leading zeros not significant');
                 T('sf', { literal: '1020' }, 3, 'AP408. countSigFigs: integer strips ambiguous trailing zeros');
@@ -764,6 +899,8 @@
                         if (Object.prototype.hasOwnProperty.call(test, 'wolframAppId')) {
                             calc.wolframAppId = test.wolframAppId;
                         }
+                        calc.groupDigits = test.groupDigits === true;
+                        calc._activeCurrency = null;
                         calc.calcInput = host.querySelector('#calcInput');
                         calc.calcResults = host.querySelector('#calcResults');
                         calc.calcResultsWrapper = host.querySelector('#calcResultsWrapper');
@@ -772,15 +909,32 @@
                         calc.saveState = function () {};
                         calc.scrollToBottom = function () {};
 
-                        for (let i = 0; i < test.steps.length; i++) {
-                            calc.calcInput.value = test.steps[i];
-                            await calc.processInput();
+                        const rateFixture = {
+                            USD: 1, EUR: 0.85, GBP: 0.73, JPY: 110, CAD: 1.25, AUD: 1.35,
+                            CHF: 0.92, CNY: 6.45, MXN: 17, RUB: 90
+                        };
+                        let savedRates = null;
+                        if (test.freezeRates && typeof CURRENCIES !== 'undefined') {
+                            savedRates = Object.assign({}, CURRENCIES);
+                            Object.keys(CURRENCIES).forEach((key) => { delete CURRENCIES[key]; });
+                            Object.assign(CURRENCIES, rateFixture);
                         }
+                        try {
+                            for (let i = 0; i < test.steps.length; i++) {
+                                calc.calcInput.value = test.steps[i];
+                                await calc.processInput();
+                            }
 
-                        const values = calc.calcResults.querySelectorAll('.result-value');
-                        const last = values.length ? values[values.length - 1].textContent : '';
-                        document.body.removeChild(host);
-                        return { status: last === test.expected ? 'PASS' : 'FAIL', actual: String(last) };
+                            const values = calc.calcResults.querySelectorAll('.result-value');
+                            const last = values.length ? values[values.length - 1].textContent : '';
+                            return { status: last === test.expected ? 'PASS' : 'FAIL', actual: String(last) };
+                        } finally {
+                            if (savedRates && typeof CURRENCIES !== 'undefined') {
+                                Object.keys(CURRENCIES).forEach((key) => { delete CURRENCIES[key]; });
+                                Object.assign(CURRENCIES, savedRates);
+                            }
+                            if (host.parentNode) document.body.removeChild(host);
+                        }
                     }
                     if (test.kind === 'expr') {
                         const ast = ArithmeticPrecision.parseAst(test.expr);

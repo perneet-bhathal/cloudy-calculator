@@ -13,6 +13,7 @@ class OptionsManager {
             localGoogleOn: false,
             localGoogleUrl: 'https://www.google.com',
             resultDigits: 'full',
+            groupDigits: false,
             onlineEngines: 'fallback',
             wolframAppId: 'P8EHXTA2KJ',
             // aiEnabled: false,

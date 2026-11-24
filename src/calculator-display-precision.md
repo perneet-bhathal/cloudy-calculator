@@ -40,6 +40,20 @@ Options → **Result digits**.
 - **`full`** (default): built-in display. Pure arithmetic uses the raw full-double cleanup above. Bare `pi` stays **3.14**. Unit conversions stay on the short conversion format.
 - **`1`–`15`**: force that many significant digits on the full value. **`15`** is full double precision, including `pi` and unit conversions. This is the control when a result looks too short.
 
+## Currency symbols
+
+A currency symbol glued to a number is money, not a syntax error. `£122 + 2` and `£122 + £2` both display `£124.00`. The symbol may sit before the number (`£122`, `£ 122`) or after it (`122£`). The result uses the first symbol and that currency's minor units (2 for pound, dollar, and euro; 0 for yen, won, and dong; 3 for dinar).
+
+A bare number in the same expression is already in that currency. A different symbol is converted with the rates already loaded for currency exchange (`CURRENCIES`, 1 USD = X units). No extra rate service is added. The symbol list is the common set in `CURRENCY_SYMBOLS` (about 50), matched longest-first so `HK$` is not read as dollars. If a mixed pair has no rate, the result is `No exchange rate for XXX`.
+
+Continuing with `+2` after a currency result keeps that symbol. Result digits do not strip the currency fraction.
+
+## Thousands separators
+
+Options → **Thousands separators** (`groupDigits`, off by default).
+
+The checkbox only changes display. `1536` becomes `1,536`, and a value already shown with decimals keeps them (`1536.50` becomes `1,536.50`). Currency results pick up the commas too (`£1,536.50`). Input commas are still grouping marks, as before. Scientific notation keeps an ungrouped exponent.
+
 ## Operator precedence
 
 `^` and `**` are **right-associative** (`2^3^2` = `2^(3^2)` = 512). Unary minus binds looser than power (`-2^2` = -4). `*` and `/` still bind tighter than `+` and `-`. `2pi` and `2(3+4)` are multiplication.

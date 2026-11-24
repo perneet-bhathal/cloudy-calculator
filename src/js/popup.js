@@ -27,6 +27,253 @@ function stripGroupingCommas(text) {
     return String(text).replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '');
 }
 
+/**
+ * Insert ASCII thousands separators into a finished numeric display string.
+ * 1536 → 1,536 and 1536.50 → 1,536.50. Exponents keep their own digits.
+ */
+function applyThousandsSeparators(text) {
+    const s = String(text);
+    const scientific = s.match(/^([+-]?)(\d+(?:\.\d+)?)([eE][+-]?\d+)$/);
+    if (scientific) {
+        return scientific[1] + groupIntegerDigits(scientific[2]) + scientific[3];
+    }
+    const plain = s.match(/^([+-]?)(\d+)(\.\d+)?$/);
+    if (!plain) return s;
+    return plain[1] + groupIntegerDigits(plain[2]) + (plain[3] || '');
+}
+
+function groupIntegerDigits(integerPart) {
+    const parts = String(integerPart).split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+}
+
+/**
+ * Symbols for the most used currencies. Longer symbols are matched first
+ * so HK$ is not read as H + K + USD. Rates come from the existing CURRENCIES
+ * table (1 USD = X units); this list does not add another rate API.
+ * decimals follow ISO 4217 minor units (yen and won have none; dinar has three).
+ */
+const CURRENCY_SYMBOLS = [
+    { symbol: 'COL$', code: 'COP', decimals: 2 },
+    { symbol: 'Mex$', code: 'MXN', decimals: 2 },
+    { symbol: 'AU$', code: 'AUD', decimals: 2 },
+    { symbol: 'CA$', code: 'CAD', decimals: 2 },
+    { symbol: 'HK$', code: 'HKD', decimals: 2 },
+    { symbol: 'NZ$', code: 'NZD', decimals: 2 },
+    { symbol: 'NT$', code: 'TWD', decimals: 2 },
+    { symbol: 'US$', code: 'USD', decimals: 2 },
+    { symbol: 'JP¥', code: 'JPY', decimals: 0 },
+    { symbol: 'CN¥', code: 'CNY', decimals: 2 },
+    { symbol: 'MX$', code: 'MXN', decimals: 2 },
+    { symbol: 'CL$', code: 'CLP', decimals: 0 },
+    { symbol: 'AR$', code: 'ARS', decimals: 2 },
+    { symbol: 'د.إ', code: 'AED', decimals: 2 },
+    { symbol: 'د.ك', code: 'KWD', decimals: 3 },
+    { symbol: 'ر.س', code: 'SAR', decimals: 2 },
+    { symbol: 'ر.ع', code: 'OMR', decimals: 3 },
+    { symbol: 'ر.ق', code: 'QAR', decimals: 2 },
+    { symbol: 'E£', code: 'EGP', decimals: 2 },
+    { symbol: 'A$', code: 'AUD', decimals: 2 },
+    { symbol: 'C$', code: 'CAD', decimals: 2 },
+    { symbol: 'S$', code: 'SGD', decimals: 2 },
+    { symbol: 'R$', code: 'BRL', decimals: 2 },
+    { symbol: 'zł', code: 'PLN', decimals: 2 },
+    { symbol: 'Kč', code: 'CZK', decimals: 2 },
+    { symbol: 'kr', code: 'SEK', decimals: 2 },
+    { symbol: 'Rp', code: 'IDR', decimals: 2 },
+    { symbol: 'RM', code: 'MYR', decimals: 2 },
+    { symbol: 'Ft', code: 'HUF', decimals: 2 },
+    { symbol: 'Fr', code: 'CHF', decimals: 2 },
+    { symbol: '$', code: 'USD', decimals: 2 },
+    { symbol: '€', code: 'EUR', decimals: 2 },
+    { symbol: '£', code: 'GBP', decimals: 2 },
+    { symbol: '¥', code: 'JPY', decimals: 0 },
+    { symbol: '₹', code: 'INR', decimals: 2 },
+    { symbol: '₽', code: 'RUB', decimals: 2 },
+    { symbol: '₩', code: 'KRW', decimals: 0 },
+    { symbol: '₺', code: 'TRY', decimals: 2 },
+    { symbol: '₫', code: 'VND', decimals: 0 },
+    { symbol: '₱', code: 'PHP', decimals: 2 },
+    { symbol: '₦', code: 'NGN', decimals: 2 },
+    { symbol: '₴', code: 'UAH', decimals: 2 },
+    { symbol: '₪', code: 'ILS', decimals: 2 },
+    { symbol: '฿', code: 'THB', decimals: 2 },
+    { symbol: '₡', code: 'CRC', decimals: 2 },
+    { symbol: '₲', code: 'PYG', decimals: 0 },
+    { symbol: '₵', code: 'GHS', decimals: 2 },
+    { symbol: '₸', code: 'KZT', decimals: 2 },
+    { symbol: '₼', code: 'AZN', decimals: 2 },
+    { symbol: '₾', code: 'GEL', decimals: 2 },
+    { symbol: '৳', code: 'BDT', decimals: 2 },
+    { symbol: '₨', code: 'PKR', decimals: 2 },
+    { symbol: '元', code: 'CNY', decimals: 2 },
+    { symbol: '﷼', code: 'SAR', decimals: 2 }
+].sort((a, b) => b.symbol.length - a.symbol.length);
+
+function currencyBoundaryBefore(expr, index) {
+    if (index <= 0) return true;
+    return /[+\-*/^(]/.test(expr[index - 1]);
+}
+
+function currencyBoundaryAfter(expr, index) {
+    if (index >= expr.length) return true;
+    return /[+\-*/^)]/.test(expr[index]);
+}
+
+function readPlainNumberAt(expr, index) {
+    const match = expr.slice(index).match(/^(?:\d+\.\d+|\d+|\.\d+)(?:[eE][+\-]?\d+)?/);
+    if (!match) return null;
+    const value = Number(match[0]);
+    if (!isFinite(value)) return null;
+    return { text: match[0], end: index + match[0].length, value: value };
+}
+
+function matchCurrencyPrefix(expr, index) {
+    if (!currencyBoundaryBefore(expr, index)) return null;
+    for (let i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+        const cur = CURRENCY_SYMBOLS[i];
+        if (!expr.startsWith(cur.symbol, index)) continue;
+        let cursor = index + cur.symbol.length;
+        let sign = 1;
+        if (expr[cursor] === '+' || expr[cursor] === '-') {
+            if (expr[cursor] === '-') sign = -1;
+            cursor++;
+        }
+        const num = readPlainNumberAt(expr, cursor);
+        if (!num) continue;
+        return {
+            start: index,
+            end: num.end,
+            symbol: cur.symbol,
+            code: cur.code,
+            decimals: cur.decimals,
+            amount: sign * num.value
+        };
+    }
+    return null;
+}
+
+function matchCurrencySuffix(expr, index) {
+    if (!currencyBoundaryBefore(expr, index)) return null;
+    if (expr[index] !== '.' && !/\d/.test(expr[index] || '')) return null;
+    const num = readPlainNumberAt(expr, index);
+    if (!num) return null;
+    for (let i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+        const cur = CURRENCY_SYMBOLS[i];
+        if (!expr.startsWith(cur.symbol, num.end)) continue;
+        const end = num.end + cur.symbol.length;
+        if (!currencyBoundaryAfter(expr, end)) continue;
+        return {
+            start: index,
+            end: end,
+            symbol: cur.symbol,
+            code: cur.code,
+            decimals: cur.decimals,
+            amount: num.value
+        };
+    }
+    return null;
+}
+
+function currencyRateTable() {
+    if (typeof CURRENCIES !== 'undefined' && CURRENCIES) return CURRENCIES;
+    return null;
+}
+
+/** Convert using the loaded table, where each rate is units of that currency per 1 USD. */
+function convertCurrencyAmount(amount, fromCode, toCode) {
+    if (fromCode === toCode) return amount;
+    const rates = currencyRateTable();
+    const fromRate = rates ? rates[fromCode] : undefined;
+    const toRate = rates ? rates[toCode] : undefined;
+    if (!(fromRate > 0) || !(toRate > 0)) {
+        const missing = !(fromRate > 0) ? fromCode : toCode;
+        throw new Error('No exchange rate for ' + missing);
+    }
+    return amount / fromRate * toRate;
+}
+
+function currencyNumberLiteral(amount) {
+    if (!isFinite(amount)) throw new Error('Result is not finite');
+    if (Object.is(amount, -0) || amount === 0) return '0';
+    return Number(amount.toPrecision(15)).toString();
+}
+
+/**
+ * £122 + £2 and £122 + 2 both become plain arithmetic in the first currency.
+ * A different symbol is converted with the current rate table first.
+ * Returns currency: null when the expression has no currency amount.
+ */
+function rewriteCurrencyExpression(expr) {
+    const matches = [];
+    let index = 0;
+    while (index < expr.length) {
+        const prefix = matchCurrencyPrefix(expr, index);
+        if (prefix) {
+            matches.push(prefix);
+            index = prefix.end;
+            continue;
+        }
+        const suffix = matchCurrencySuffix(expr, index);
+        if (suffix) {
+            matches.push(suffix);
+            index = suffix.end;
+            continue;
+        }
+        index++;
+    }
+    if (matches.length === 0) return { expr: expr, currency: null };
+
+    const currency = {
+        symbol: matches[0].symbol,
+        code: matches[0].code,
+        decimals: matches[0].decimals
+    };
+    let out = '';
+    let cursor = 0;
+    for (let i = 0; i < matches.length; i++) {
+        const match = matches[i];
+        const converted = convertCurrencyAmount(match.amount, match.code, currency.code);
+        out += expr.slice(cursor, match.start) + currencyNumberLiteral(converted);
+        cursor = match.end;
+    }
+    out += expr.slice(cursor);
+    return { expr: out, currency: currency };
+}
+
+function stripCurrencySymbols(text) {
+    let s = String(text);
+    for (let i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+        const symbol = CURRENCY_SYMBOLS[i].symbol;
+        if (s.indexOf(symbol) !== -1) s = s.split(symbol).join('');
+    }
+    return s;
+}
+
+/**
+ * e and E are the constant, except when they begin a currency symbol such as E£.
+ */
+function replaceConstantE(expr) {
+    return String(expr).replace(/\be\b/gi, function (match, offset, str) {
+        for (let i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+            const symbol = CURRENCY_SYMBOLS[i].symbol;
+            if (symbol.length > 1 && str.startsWith(symbol, offset)) return match;
+        }
+        return String(Math.E);
+    });
+}
+
+function roundCurrencyValue(value, decimals) {
+    const rounded = Number(Number(value).toFixed(decimals));
+    if (Object.is(rounded, -0)) return 0;
+    return rounded;
+}
+
+if (typeof window !== 'undefined') {
+    window.CLOUDY_CURRENCY_SYMBOLS = CURRENCY_SYMBOLS;
+}
+
 /*
 // AI-assisted error resolution system
 class AIErrorResolver {
@@ -137,8 +384,10 @@ class CloudyCalculator {
         this.historyIndex = -1;
         this.variables = { '@': 0 }; // @ is the last result
         this.resultDigits = null; // null = built-in display; 1–15 forces significant digits
+        this.groupDigits = false; // thousands separators in results, off until Options enables them
         this.onlineEngines = 'fallback'; // off | fallback | prefer
         this.wolframAppId = 'P8EHXTA2KJ';
+        this._activeCurrency = null;
         this._onlineTried = false;
         // this.aiResolver = new AIErrorResolver();
         this.init();
@@ -183,6 +432,19 @@ class CloudyCalculator {
         const atRaw = this.variables['@'];
         const parsedAt = this.parseNumericFromResult(atRaw);
         return (typeof parsedAt === 'number' && isFinite(parsedAt)) ? parsedAt : 0;
+    }
+
+    /**
+     * Currency symbol from the latest result, so +2 after £124.00 stays in pounds.
+     */
+    getContinuationCurrencySymbol() {
+        if (!this.calcResults) return '';
+        const resultItems = this.calcResults.querySelectorAll('.result-item');
+        if (!resultItems || resultItems.length === 0) return '';
+        const lastItem = resultItems[resultItems.length - 1];
+        const lastValueNode = lastItem.querySelector('.result-value');
+        if (!lastValueNode || !lastValueNode.dataset) return '';
+        return lastValueNode.dataset.currencySymbol || '';
     }
 
     async init() {
@@ -259,7 +521,7 @@ class CloudyCalculator {
         if (typeof val !== 'string') {
             return NaN;
         }
-        const t = stripGroupingCommas(val.trim());
+        const t = stripCurrencySymbols(stripGroupingCommas(val.trim()));
         if (/^0b[01]+$/i.test(t)) {
             return parseInt(t.slice(2), 2);
         }
@@ -350,9 +612,10 @@ class CloudyCalculator {
         try {
             const options = await chrome.storage.local.get([
                 'zoom', 'height', 'width', 'titleFont', 'headerLinksFont', 'resultFont', 'inputFont',
-                'resultDigits', 'onlineEngines', 'wolframAppId'
+                'resultDigits', 'groupDigits', 'onlineEngines', 'wolframAppId'
             ]);
             this.resultDigits = this.normalizeResultDigits(options.resultDigits);
+            this.groupDigits = options.groupDigits === true;
             this.onlineEngines = this.normalizeOnlineEngines(options.onlineEngines);
             // A saved empty string turns Wolfram off. A missing key keeps the built-in App ID.
             this.wolframAppId = Object.prototype.hasOwnProperty.call(options, 'wolframAppId')
@@ -644,17 +907,38 @@ class CloudyCalculator {
             let expression = input;
             if (this.shouldTreatAsContinuationInput(input)) {
                 const continuationBase = popupSnapNearIntegerFloat(this.getContinuationBaseValue());
+                const carriedSymbol = this.getContinuationCurrencySymbol();
+                const baseToken = carriedSymbol
+                    ? '(' + carriedSymbol + continuationBase + ')'
+                    : '(' + continuationBase + ')';
                 // Build continuation expression directly from numeric base so stale @ cannot affect chaining.
-                expression = '(' + continuationBase + ')' + input;
+                expression = baseToken + input;
             }
             
             // Substitute variables and evaluate
             expression = this.substituteVariables(expression);
             const result = this.evaluateExpression(expression);
+            const currency = this._activeCurrency;
             
             // ALWAYS store result as @ (ensure it's a valid number)
             if (typeof result === 'number' && isFinite(result)) {
-                this.variables['@'] = popupSnapNearIntegerFloat(result);
+                const stored = currency
+                    ? roundCurrencyValue(result, currency.decimals)
+                    : popupSnapNearIntegerFloat(result);
+                this.variables['@'] = stored;
+                if (currency) {
+                    const display = this.formatCurrencyAmount(stored, currency);
+                    this.addResult(input, display, 'normal', null, null, {
+                        symbol: currency.symbol,
+                        code: currency.code,
+                        decimals: currency.decimals,
+                        numeric: stored
+                    });
+                    this.saveState();
+                    this.calcInput.value = '';
+                    this.focusInput();
+                    return;
+                }
             } else {
                 // If result is not a valid number, set @ to 0
                 this.variables['@'] = 0;
@@ -726,7 +1010,10 @@ class CloudyCalculator {
             try {
                 const substituted = this.substituteVariables(expression);
                 const value = this.evaluateExpression(substituted);
-                const stored = typeof value === 'number' && isFinite(value) ? popupSnapNearIntegerFloat(value) : value;
+                const currency = this._activeCurrency;
+                const stored = (typeof value === 'number' && isFinite(value))
+                    ? (currency ? roundCurrencyValue(value, currency.decimals) : popupSnapNearIntegerFloat(value))
+                    : value;
                 this.variables[varName] = stored;
                 // Ensure @ is set to a valid number
                 if (typeof value === 'number' && isFinite(value)) {
@@ -734,7 +1021,17 @@ class CloudyCalculator {
                 } else {
                     this.variables['@'] = 0;
                 }
-                this.addResult(input, `${varName} = ${stored}`, 'variable');
+                if (currency && typeof stored === 'number') {
+                    const display = this.formatCurrencyAmount(stored, currency);
+                    this.addResult(input, `${varName} = ${display}`, 'variable', null, null, {
+                        symbol: currency.symbol,
+                        code: currency.code,
+                        decimals: currency.decimals,
+                        numeric: stored
+                    });
+                } else {
+                    this.addResult(input, `${varName} = ${stored}`, 'variable');
+                }
                 return true;
             } catch (error) {
                 // If we get here, both unit conversion and main parser failed
@@ -916,13 +1213,23 @@ class CloudyCalculator {
 
         // Substitute constants (any case: pi, PI, e, E). \b keeps scientific notation such as 1E3 intact.
         expr = expr.replace(/\bpi\b/gi, Math.PI.toString());
-        expr = expr.replace(/\be\b/gi, Math.E.toString());
+        expr = replaceConstantE(expr);
 
         return expr;
     }
 
+    formatCurrencyAmount(value, currency) {
+        const decimals = currency && typeof currency.decimals === 'number' ? currency.decimals : 2;
+        const symbol = currency && currency.symbol ? currency.symbol : '';
+        const negative = value < 0;
+        let body = Math.abs(Number(value)).toFixed(decimals);
+        if (this.groupDigits) body = applyThousandsSeparators(body);
+        return (negative ? '-' : '') + symbol + body;
+    }
+
     evaluateExpression(expression) {
         // Safe recursive descent parser
+        this._activeCurrency = null;
         let expr = stripGroupingCommas(expression).replace(/\s/g, ''); // Remove spaces and grouping commas
         
         // Handle trailing operators by removing them
@@ -930,6 +1237,10 @@ class CloudyCalculator {
         // Also handles multiple trailing operators like "8+8++" or "5*3--"
         // Strip trailing "=" (calculator-style input like "10000*50=")
         expr = expr.replace(/[+\-*/^=]+$/, '');
+
+        const rewritten = rewriteCurrencyExpression(expr);
+        expr = rewritten.expr;
+        this._activeCurrency = rewritten.currency;
         
         let pos = 0;
 
@@ -1113,7 +1424,7 @@ class CloudyCalculator {
         // Juxtaposition (2pi, 2(3+4)) then a second constant pass in case this string skipped substituteVariables.
         expr = this.insertImplicitMultiplication(expr);
         expr = expr.replace(/\bpi\b/gi, String(Math.PI));
-        expr = expr.replace(/\be\b/gi, String(Math.E));
+        expr = replaceConstantE(expr);
 
         // Handle degrees conversion before parsing
         expr = expr.replace(/(\d+(?:\.\d+)?)degrees?/g, '($1*' + (Math.PI / 180) + ')');
@@ -1159,6 +1470,12 @@ class CloudyCalculator {
     }
 
     formatNumber(num, formatSpec = null) {
+        const formatted = this.formatNumberUngrouped(num, formatSpec);
+        if (!this.groupDigits || typeof formatted !== 'string') return formatted;
+        return applyThousandsSeparators(formatted);
+    }
+
+    formatNumberUngrouped(num, formatSpec = null) {
         if (typeof num !== 'number' || !isFinite(num)) {
             return num;
         }
@@ -1207,7 +1524,7 @@ class CloudyCalculator {
         return String(num);
     }
 
-    addResult(input, result, type = 'normal', precisionSourceInput = null, onlineSource = null) {
+    addResult(input, result, type = 'normal', precisionSourceInput = null, onlineSource = null, currencyMeta = null) {
         const li = document.createElement('li');
         li.className = 'result-item';
         
@@ -1219,7 +1536,9 @@ class CloudyCalculator {
         // Online engine text is shown as returned so a later digit cap cannot shorten it.
         const formatSpec = this.getDisplayFormatSpec(precisionSourceInput || input);
         let displayResult = result;
-        if (type === 'online') {
+        if (currencyMeta) {
+            displayResult = String(result);
+        } else if (type === 'online') {
             displayResult = String(result);
         } else if (typeof result === 'number' && isFinite(result)) {
             displayResult = this.formatNumber(result, formatSpec);
@@ -1260,7 +1579,14 @@ class CloudyCalculator {
         resultSpan.className = `outputText result-value ${type}`;
         resultSpan.textContent = displayResult;
         resultSpan.style.cursor = 'pointer';
-        resultSpan.dataset.value = displayResult;
+        if (currencyMeta && typeof currencyMeta.numeric === 'number' && isFinite(currencyMeta.numeric)) {
+            resultSpan.dataset.value = String(currencyMeta.numeric);
+            resultSpan.dataset.currencySymbol = currencyMeta.symbol || '';
+            resultSpan.dataset.currencyCode = currencyMeta.code || '';
+            resultSpan.dataset.currencyDecimals = String(currencyMeta.decimals);
+        } else {
+            resultSpan.dataset.value = displayResult;
+        }
         if (onlineSource) {
             const tag = document.createElement('span');
             tag.className = 'result-source';
