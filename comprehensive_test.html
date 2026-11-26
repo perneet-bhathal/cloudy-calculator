@@ -180,10 +180,10 @@
                 this.addTest("gamma", "≈0.5772156649", "76. gamma → ≈0.5772156649");
 
                 // Currency tests
-                this.addTest("100 USD to EUR", "numeric", "77. 100 USD to EUR → numeric");
-                this.addTest("50 EUR to USD", "numeric", "78. 50 EUR to USD → numeric");
-                this.addTest("100 JPY to GBP", "numeric", "79. 100 JPY to GBP → numeric");
-                this.addTest("1 CHF to CNY", "numeric", "80. 1 CHF to CNY → numeric");
+                this.addTest("100 USD to EUR", "current exchange rate not available", "77. 100 USD to EUR → unavailable without a live rate");
+                this.addTest("50 EUR to USD", "current exchange rate not available", "78. 50 EUR to USD → unavailable without a live rate");
+                this.addTest("100 JPY to GBP", "current exchange rate not available", "79. 100 JPY to GBP → unavailable without a live rate");
+                this.addTest("1 CHF to CNY", "current exchange rate not available", "80. 1 CHF to CNY → unavailable without a live rate");
 
                 // Mixed-unit expressions tests
                 this.addTest("5mi + 3km in km", "≈11.046", "81. 5mi + 3km in km → ≈11.046");
@@ -213,7 +213,7 @@
                 this.addTest("1800sqm to sqf =", "≈19375.04", "101. 1800sqm to sqf = → ≈19375.04");
                 this.addTest("1800 sqm to sqf =", "≈19375.04", "102. 1800 sqm to sqf = → ≈19375.04");
                 this.addTest("1800 sqm to sq feet =", "≈19375.04", "103. 1800 sqm to sq feet = → ≈19375.04");
-                this.addTest("46000 rub to$ =", "numeric", "104. 46000 rub to$ = → numeric");
+                this.addTest("46000 rub to$ =", "current exchange rate not available", "104. 46000 rub to$ = → unavailable without a live rate");
 
                 // Error handling tests
                 this.addTest("5 m + 3 s", "❌", "101. 5 m + 3 s → ❌ \"dimensions are incompatible\"");
@@ -487,9 +487,9 @@
                 this.addTest("h * c", "≈1.98644586e-25", "363. h * c → ≈1.98644586e-25");
                 this.addTest("phi^2 - phi", "1", "364. phi^2 - phi → 1 (golden ratio identity)");
                 this.addTest("R / NA", "≈1.380649e-23", "365. R / NA → ≈1.380649e-23 (Boltzmann k)");
-                this.addTest("123.45 USD to JPY", "numeric", "366. 123.45 USD to JPY → numeric (no crash)");
-                this.addTest("999 EUR to CHF", "numeric", "367. 999 EUR to CHF → numeric");
-                this.addTest("1 CNY to GBP", "numeric", "368. 1 CNY to GBP → numeric");
+                this.addTest("123.45 USD to JPY", "current exchange rate not available", "366. 123.45 USD to JPY → unavailable without a live rate");
+                this.addTest("999 EUR to CHF", "current exchange rate not available", "367. 999 EUR to CHF → unavailable without a live rate");
+                this.addTest("1 CNY to GBP", "current exchange rate not available", "368. 1 CNY to GBP → unavailable without a live rate");
                 this.addTest("2 hours in minute", "120", "369. 2 hours in minute → 120");
                 this.addTest("750 millilitres in cup", "≈3.1701", "370. 750 millilitres in cup → ≈3.1701");
                 this.addTest("10 lbs in kilogram", "≈4.5359237", "371. 10 lbs in kilogram → ≈4.5359237");
@@ -716,8 +716,8 @@
                 T('popupFlow', { steps: ['2+2:g'] }, 'Google calculator returned no result', 'AP571. :g asks Google and reports a miss without a browser permission');
                 T('popupFlow', { steps: ['2+2:w'] }, 'Add a Wolfram App ID in Options', 'AP572. :w asks for an App ID when none is saved');
 
-                // Currency symbols in arithmetic. Rates are frozen to the built-in table
-                // (1 USD = X) so mixed-currency cases do not follow a live API refresh.
+                // Currency symbols in arithmetic. freezeRates stands in for a successful
+                // exchangerate-api check. There is no standby rate table in the extension.
                 T('popupFlow', { steps: ['£122 + 2'], freezeRates: true }, '£124.00', 'CUR01. £122 + 2 keeps the pound and two decimals');
                 T('popupFlow', { steps: ['£122 + £2'], freezeRates: true }, '£124.00', 'CUR02. £122 + £2');
                 T('popupFlow', { steps: ['£122+£2'], freezeRates: true }, '£124.00', 'CUR03. no spaces');
@@ -802,10 +802,75 @@
                 T('popupFlow', { steps: ['x = £10 + £2', 'x + £1'], freezeRates: true }, '£13.00', 'CUR79. a saved price adds as a number');
                 T('popupFlow', { steps: ['x = £10 + £2', '+2'], freezeRates: true }, '£14.00', 'CUR80. +2 after an assignment keeps the symbol');
 
-                T('popupFlow', { steps: ['£1 + ₹1'], freezeRates: true, onlineEngines: 'off' }, 'Error: No exchange rate for INR', 'CUR81. mixed currency without a rate is an error');
+                T('popupFlow', { steps: ['£1 + ₹1'], freezeRates: true, onlineEngines: 'off' }, 'current exchange rate not available', 'CUR81. a currency missing from the loaded table is unavailable');
                 T('popupFlow', { steps: ['§5+1'], freezeRates: true, onlineEngines: 'off' }, 'Error: Expected number, function, or parenthesized expression', 'CUR82. an unknown sign is still a syntax error');
                 T('popupFlow', { steps: ['£'], freezeRates: true, onlineEngines: 'off' }, 'Error: Expected number, function, or parenthesized expression', 'CUR83. a bare symbol is not a number');
                 T('popupFlow', { steps: ['£5 / £0'], freezeRates: true, onlineEngines: 'off' }, 'Error: Division by zero', 'CUR84. currency does not hide division by zero');
+
+                T('popupFlow', { steps: ['JP¥155,520 in usd'], freezeRates: true }, '1413.82 USD', 'CUR85. JP¥155,520 in usd');
+                T('popupFlow', { steps: ['JP¥155,520 in $'], freezeRates: true }, '$1413.82', 'CUR86. JP¥155,520 in $');
+                T('popupFlow', { steps: ['JP¥155,520 in $$'], freezeRates: true }, '$1413.82', 'CUR87. $$ is USD');
+                T('popupFlow', { steps: ['JP¥155,520 to USD'], freezeRates: true }, '1413.82 USD', 'CUR88. to USD');
+                T('popupFlow', { steps: ['¥155,520 in usd'], freezeRates: true }, '1413.82 USD', 'CUR89. plain yen sign');
+                T('popupFlow', { steps: ['155,520 JPY in usd'], freezeRates: true }, '1413.82 USD', 'CUR90. code with a thousands comma');
+                T('popupFlow', { steps: ['£100 in usd'], freezeRates: true }, '136.99 USD', 'CUR91. pounds in usd');
+                T('popupFlow', { steps: ['£100 in $'], freezeRates: true }, '$136.99', 'CUR92. pounds in $');
+                T('popupFlow', { steps: ['100 USD to EUR'], freezeRates: true }, '85.00 EUR', 'CUR93. code to code still converts');
+                T('popupFlow', { steps: ['1 euro in usd'], freezeRates: true }, '1.18 USD', 'CUR94. currency name in usd');
+                T('popupFlow', { steps: ['JP¥155,520 in usd ='], freezeRates: true }, '1413.82 USD', 'CUR95. trailing equals');
+                T('popupFlow', { steps: ['JP¥155,520 in usd'], freezeRates: true, groupDigits: true }, '1,413.82 USD', 'CUR96. converted code picks up thousands separators');
+                T('popupFlow', { steps: ['JP¥155,520 in $'], freezeRates: true, groupDigits: true }, '$1,413.82', 'CUR97. converted symbol picks up thousands separators');
+                T('popupFlow', { steps: ['100 ABC to USD'], freezeRates: true, onlineEngines: 'off' }, 'Error: Unexpected character: A', 'CUR98. unknown currency still fails');
+                T('popupFlow', { steps: ['JP¥155,520 in usd'], liveRates: { USD: 1, JPY: 150 } }, '1036.80 USD', 'CUR99. in usd waits for loaded exchange rates');
+                T('popupFlow', { steps: ['JP¥155,520 in $'], liveRates: { USD: 1, JPY: 150 } }, '$1036.80', 'CUR100. in $ waits for loaded exchange rates');
+                T('popupFlow', { steps: ['JP¥155,520 in $$'], liveRates: { USD: 1, JPY: 150 } }, '$1036.80', 'CUR101. in $$ waits for loaded exchange rates');
+                T('popupFlow', { steps: ['£100 + $10'], liveRates: { USD: 1, GBP: 0.8 } }, '£108.00', 'CUR102. mixed symbols wait for loaded exchange rates');
+                T('popupFlow', { steps: ['JP¥155,520 in usd'], onlineEngines: 'off' }, 'current exchange rate not available', 'CUR103. in usd with no rate check');
+                T('popupFlow', { steps: ['JP¥155,520 in $'], onlineEngines: 'off' }, 'current exchange rate not available', 'CUR104. in $ with no rate check');
+                T('popupFlow', { steps: ['JP¥155,520 in $$'], onlineEngines: 'off' }, 'current exchange rate not available', 'CUR105. in $$ with no rate check');
+                T('popupFlow', { steps: ['£100 + $10'], onlineEngines: 'off' }, 'current exchange rate not available', 'CUR106. mixed symbols with no rate check');
+                T('popupFlow', { steps: ['£122 + £2'], onlineEngines: 'off' }, '£124.00', 'CUR107. same currency does not need an exchange rate');
+                T('popupFlow', { steps: ['£122 + £2 -$4'], onlineRates: { 'USD:GBP': 0.8 } }, '£120.80', 'CUR108. pounds minus dollars asks for dollars to pounds');
+                T('popupFlow', { steps: ['£122 + £2 -$4'], onlineRates: { 'USD:GBP': '1 USD = 0.80 GBP' } }, '£120.80', 'CUR109. a quoted sentence is the pair rate');
+                T('popupFlow', { steps: ['JP¥155,520 in usd'], onlineRates: { 'JPY:USD': 1 / 150 } }, '1036.80 USD', 'CUR110. yen to dollars asks for yen to dollars');
+                T('popupFlow', { steps: ['JP¥155,520 in $'], onlineRates: { 'JPY:USD': 1 / 150 } }, '$1036.80', 'CUR111. yen to $ asks for yen to dollars');
+                T('popupFlow', { steps: ['JP¥155,520 in $$'], onlineRates: { 'JPY:USD': 1 / 150 } }, '$1036.80', 'CUR112. yen to $$ asks for yen to dollars');
+                T('popupFlow', { steps: ['£100 + $10'], onlineRates: { 'USD:GBP': 0.8 } }, '£108.00', 'CUR113. mixed symbols use the direct pair');
+                T('popupFlow', { steps: ['£100 + €10'], onlineRates: { 'EUR:GBP': 0.8 / 0.9 } }, '£108.89', 'CUR114. euro to pounds does not go through dollars');
+                T('popupFlow', { steps: ['£122 + £2 -$4'], onlineRates: { 'USD:GBP': 'no rate here' } }, 'current exchange rate not available', 'CUR115. an unusable quote stays unavailable');
+                T('popupFlow', { steps: ['£122 + £2 -$4'], onlineRates: { 'USD:GBP': 0.8 }, onlineEngines: 'off' }, 'current exchange rate not available', 'CUR116. online engines off does not take the quote');
+                T('popupFlow', { steps: ['€100 + £10'], onlineRates: { 'GBP:EUR': 1.2 } }, '€112.00', 'CUR117. euro plus pounds asks for pounds to euros');
+                T('popupFlow', { steps: ['€10 + £5'], onlineRates: { 'USD:EUR': 0.9, 'USD:GBP': 0.8 } }, 'current exchange rate not available', 'CUR118. a dollar quote is not used for a euro and pound sum');
+                T('popupFlow', { steps: ['100 SEK to NOK'], onlineRates: { 'SEK:NOK': 0.95 } }, '95.00 NOK', 'CUR119. krona to krone by ISO code');
+                T('popupFlow', { steps: ['100 THB in ZAR'], onlineRates: { 'THB:ZAR': 0.5 } }, '50.00 ZAR', 'CUR120. baht to rand by ISO code');
+                T('popupFlow', { steps: ['100SEK + 50NOK'], onlineRates: { 'NOK:SEK': 1.1 } }, '155.00 SEK', 'CUR121. code arithmetic uses the direct pair');
+                T('popupFlow', { steps: ['100SEK + 50NOK', '+2'], onlineRates: { 'NOK:SEK': 1.1 } }, '157.00 SEK', 'CUR122. continuation keeps the ISO code');
+                T('popupFlow', { steps: ['100￥ + 20'] }, '￥120', 'CUR123. Japanese yen key, including a bare number');
+                T('popupFlow', { steps: ['20￥ + ￥5'] }, '￥25', 'CUR124. yen key before or after the amount');
+                T('popupFlow', { steps: ['￥15000 in $'], onlineRates: { 'JPY:USD': 0.01 } }, '$150.00', 'CUR125. yen key converts as yen');
+                T('popupFlow', { steps: ['￦1000 + ￦1'] }, '￦1001', 'CUR126. Korean won key');
+                T('popupFlow', { steps: ['100đ + 50'] }, 'đ150', 'CUR127. Vietnamese dong key');
+                T('popupFlow', { steps: ['＄10 + ＄2'] }, '＄12.00', 'CUR128. fullwidth dollar key');
+                T('popupFlow', { steps: ['￡10 + 2'] }, '￡12.00', 'CUR129. fullwidth pound key');
+                T('popupFlow', { steps: ['mxn 2000 to $'], freezeRates: true }, '$117.65', 'CUR130. code before the amount');
+                T('popupFlow', { steps: ['JPY 155520 in usd'], freezeRates: true }, '1413.82 USD', 'CUR131. JPY before the amount');
+                T('popupFlow', { steps: ['JPY155520 in $'], freezeRates: true }, '$1413.82', 'CUR132. code glued in front of the amount');
+                T('popupFlow', { steps: ['jp¥155,520 in usd'], freezeRates: true }, '1413.82 USD', 'CUR133. lowercase jp¥ is yen');
+                T('popupFlow', { steps: ['2000 mxn to $'], freezeRates: true }, '$117.65', 'CUR134. code after the amount');
+                T('popupFlow', { steps: ['mxn 2000 to $'], onlineEngines: 'off' }, 'current exchange rate not available', 'CUR135. code before the amount is not a syntax error');
+                T('popupFlow', { steps: ['JP\\155520 in usd'], freezeRates: true }, '1413.82 USD', 'CUR136. Windows yen key after JP');
+                T('popupFlow', { steps: ['mxn 2000 to eur'], freezeRates: true }, '100.00 EUR', 'CUR137. pesos to euros, code before the amount');
+                T('popupFlow', { steps: ['2000 mxn in £'], freezeRates: true }, '£85.88', 'CUR138. pesos to pounds, code after the amount');
+                T('popupFlow', { steps: ['JP¥155,520 to eur'], freezeRates: true }, '1201.75 EUR', 'CUR139. yen prefix to euros');
+                T('popupFlow', { steps: ['JPY 155520 in gbp'], freezeRates: true }, '1032.09 GBP', 'CUR140. yen code to pounds');
+                T('popupFlow', { steps: ['eur 50 to jpy'], freezeRates: true }, '6470.59 JPY', 'CUR141. euros to yen, neither side is dollars');
+                T('popupFlow', { steps: ['sek 1000 to nok'], onlineRates: { 'SEK:NOK': 0.95 } }, '950.00 NOK', 'CUR142. krona to krone asks for that pair');
+                T('rateParse', { text: '0.79' }, 0.79, 'RATE01. a bare calculator number');
+                T('rateParse', { text: '£0.79' }, 0.79, 'RATE02. a symbol on the quote');
+                T('rateParse', { text: '0.786 British pounds' }, 0.786, 'RATE03. words after the amount');
+                T('rateParse', { text: '1 USD = 150.25 JPY' }, 150.25, 'RATE04. the amount after equals');
+                T('rateParse', { text: '15,234.5' }, 15234.5, 'RATE05. grouping commas in a quote');
+                T('rateParse', { text: 'no result' }, null, 'RATE06. text with no amount');
 
                 if (window.CLOUDY_CURRENCY_SYMBOLS) {
                     window.CLOUDY_CURRENCY_SYMBOLS.forEach((cur) => {
@@ -875,6 +940,11 @@
                         const n = ArithmeticPrecision.countDecimalPlacesFromLiteral(test.literal);
                         return { status: n === test.expected ? 'PASS' : 'FAIL', actual: String(n) };
                     }
+                    if (test.kind === 'rateParse') {
+                        const n = parseQuotedRatePerUsd(test.text);
+                        const same = n === test.expected || (n == null && test.expected == null);
+                        return { status: same ? 'PASS' : 'FAIL', actual: String(n) };
+                    }
                     if (test.kind === 'popupFlow') {
                         const host = document.createElement('div');
                         host.innerHTML = [
@@ -914,10 +984,37 @@
                             CHF: 0.92, CNY: 6.45, MXN: 17, RUB: 90
                         };
                         let savedRates = null;
-                        if (test.freezeRates && typeof CURRENCIES !== 'undefined') {
+                        let savedRateLoader = null;
+                        let savedOnlineLookup = null;
+                        let savedPairRates = null;
+                        if ((test.freezeRates || test.liveRates || test.onlineRates) && typeof CURRENCY_PAIR_RATES !== 'undefined') {
+                            savedPairRates = Object.assign({}, CURRENCY_PAIR_RATES);
+                            Object.keys(CURRENCY_PAIR_RATES).forEach((key) => { delete CURRENCY_PAIR_RATES[key]; });
+                        }
+                        if ((test.freezeRates || test.liveRates || test.onlineRates) && typeof CURRENCIES !== 'undefined') {
                             savedRates = Object.assign({}, CURRENCIES);
+                        }
+                        if (test.freezeRates && typeof CURRENCIES !== 'undefined') {
                             Object.keys(CURRENCIES).forEach((key) => { delete CURRENCIES[key]; });
                             Object.assign(CURRENCIES, rateFixture);
+                        }
+                        if (test.onlineRates && typeof CURRENCIES !== 'undefined') {
+                            Object.keys(CURRENCIES).forEach((key) => { delete CURRENCIES[key]; });
+                            savedOnlineLookup = window.__CLOUDY_ONLINE_RATE_LOOKUP__;
+                            window.__CLOUDY_ONLINE_RATE_LOOKUP__ = function (from, to) {
+                                const key = from + ':' + to;
+                                return Object.prototype.hasOwnProperty.call(test.onlineRates, key)
+                                    ? test.onlineRates[key]
+                                    : null;
+                            };
+                        }
+                        if (test.liveRates && typeof loadCurrencyRates === 'function') {
+                            savedRateLoader = loadCurrencyRates;
+                            loadCurrencyRates = function () {
+                                Object.keys(CURRENCIES).forEach((key) => { delete CURRENCIES[key]; });
+                                Object.assign(CURRENCIES, test.liveRates);
+                                return Promise.resolve(CURRENCIES);
+                            };
                         }
                         try {
                             for (let i = 0; i < test.steps.length; i++) {
@@ -929,9 +1026,18 @@
                             const last = values.length ? values[values.length - 1].textContent : '';
                             return { status: last === test.expected ? 'PASS' : 'FAIL', actual: String(last) };
                         } finally {
+                            if (savedRateLoader) loadCurrencyRates = savedRateLoader;
+                            if (test.onlineRates) {
+                                if (savedOnlineLookup) window.__CLOUDY_ONLINE_RATE_LOOKUP__ = savedOnlineLookup;
+                                else delete window.__CLOUDY_ONLINE_RATE_LOOKUP__;
+                            }
                             if (savedRates && typeof CURRENCIES !== 'undefined') {
                                 Object.keys(CURRENCIES).forEach((key) => { delete CURRENCIES[key]; });
                                 Object.assign(CURRENCIES, savedRates);
+                            }
+                            if (savedPairRates && typeof CURRENCY_PAIR_RATES !== 'undefined') {
+                                Object.keys(CURRENCY_PAIR_RATES).forEach((key) => { delete CURRENCY_PAIR_RATES[key]; });
+                                Object.assign(CURRENCY_PAIR_RATES, savedPairRates);
                             }
                             if (host.parentNode) document.body.removeChild(host);
                         }
@@ -977,8 +1083,11 @@
                     }
                     
                     if (test.expected === "numeric") {
-                        // Just check if it's a number
-                        return result && !isNaN(parseFloat(result)) ? "PASS" : "FAIL";
+                        // A leading currency symbol still counts ($511.11).
+                        const cleaned = typeof stripCurrencySymbols === 'function'
+                            ? stripCurrencySymbols(result)
+                            : result;
+                        return cleaned && !isNaN(parseFloat(cleaned)) ? "PASS" : "FAIL";
                     }
                     
                     if (test.expected === "finite number") {
@@ -1005,6 +1114,11 @@
                         return Math.abs(actualNum - expectedNum) <= tolerance ? "PASS" : "FAIL";
                     }
                     
+                    // Phrases such as "current exchange rate not available" are exact text.
+                    if (isNaN(parseFloat(test.expected))) {
+                        return result === test.expected ? "PASS" : "FAIL";
+                    }
+
                     // Handle scientific notation
                     if (test.expected.includes("e")) {
                         const expectedNum = parseFloat(test.expected);

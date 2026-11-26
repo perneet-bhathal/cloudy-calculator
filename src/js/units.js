@@ -686,27 +686,42 @@ var UNITS = {
     }
 };
 
-// Currency conversion (will be updated via API)
-var CURRENCIES = {
-    USD: 1,
-    EUR: 0.85,
-    GBP: 0.73,
-    JPY: 110.0,
-    CAD: 1.25,
-    AUD: 1.35,
-    CHF: 0.92,
-    CNY: 6.45,
-    // Rates are expressed as: 1 USD = X currency units.
-    MXN: 17.0,
-    RUB: 90.0
-};
+// Filled from exchangerate-api.com, its 24-hour cache, or a Google/Wolfram quote. No standby market rates.
+var CURRENCY_RATE_UNAVAILABLE = 'current exchange rate not available';
+var CURRENCIES = {};
+// Direct quotes, "1 FROM = rate TO". Used when the USD table has no rate for the pair.
+var CURRENCY_PAIR_RATES = {};
+var KNOWN_CURRENCY_CODES = null;
+
+function knownCurrencyCodeSet() {
+    if (KNOWN_CURRENCY_CODES) return KNOWN_CURRENCY_CODES;
+    // ISO 4217 codes only. No rates. XXX and XTS are excluded so test codes stay unknown.
+    var list = (
+        'AED AFN ALL AMD ANG AOA ARS AUD AWG AZN ' +
+        'BAM BBD BDT BGN BHD BIF BMD BND BOB BOV BRL BSD BTN BWP BYN BZD ' +
+        'CAD CDF CHE CHF CHW CLF CLP CNY COP COU CRC CUP CVE CZK ' +
+        'DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP ' +
+        'GBP GEL GHS GIP GMD GNF GTQ GYD HKD HNL HTG HUF ' +
+        'IDR ILS INR IQD IRR ISK JMD JOD JPY ' +
+        'KES KGS KHR KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD ' +
+        'MAD MDL MGA MKD MMK MNT MOP MRU MUR MVR MWK MXN MXV MYR MZN ' +
+        'NAD NGN NIO NOK NPR NZD OMR PAB PEN PGK PHP PKR PLN PYG QAR ' +
+        'RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL SOS SRD STN SVC SYP SZL ' +
+        'THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX USD USN UYI UYU UYW UZS ' +
+        'VED VES VND VUV WST XAF XAG XAU XCD XDR XOF XPD XPF XPT XSU XUA ' +
+        'YER ZAR ZMW ZWL'
+    ).split(' ');
+    KNOWN_CURRENCY_CODES = {};
+    for (var i = 0; i < list.length; i++) KNOWN_CURRENCY_CODES[list[i]] = true;
+    return KNOWN_CURRENCY_CODES;
+}
 
 // Currency name to code mapping
 var CURRENCY_NAMES = {
-    'usd': 'USD', 'dollar': 'USD', 'dollars': 'USD', 'us dollar': 'USD', '$': 'USD', 'us$': 'USD',
+    'usd': 'USD', 'dollar': 'USD', 'dollars': 'USD', 'us dollar': 'USD', '$': 'USD', '$$': 'USD', 'us$': 'USD',
     'eur': 'EUR', 'euro': 'EUR', 'euros': 'EUR',
     'gbp': 'GBP', 'pound': 'GBP', 'pounds': 'GBP', 'british pound': 'GBP', 'sterling': 'GBP',
-    'jpy': 'JPY', 'yen': 'JPY', 'japanese yen': 'JPY', '¥': 'JPY',
+    'jpy': 'JPY', 'yen': 'JPY', 'japanese yen': 'JPY', '¥': 'JPY', 'jp¥': 'JPY',
     'cad': 'CAD', 'canadian dollar': 'CAD', 'canadian dollars': 'CAD',
     'aud': 'AUD', 'australian dollar': 'AUD', 'australian dollars': 'AUD',
     'chf': 'CHF', 'swiss franc': 'CHF', 'franc': 'CHF', 'francs': 'CHF',
@@ -746,17 +761,55 @@ function rebuildCurrencySymbolLookup() {
     }
 }
 
+function isKnownCurrencyCode(code) {
+    if (!/^[A-Z]{3}$/.test(code)) return false;
+    return knownCurrencyCodeSet()[code] === true;
+}
+
+function currencyMinorUnits(code) {
+    try {
+        var digits = new Intl.NumberFormat('en', {
+            style: 'currency',
+            currency: code
+        }).resolvedOptions().maximumFractionDigits;
+        if (typeof digits === 'number' && digits >= 0 && digits <= 6) return digits;
+    } catch (e) {
+        // Fall through to cents.
+    }
+    return 2;
+}
+
+/** Units of toCode per 1 fromCode, from a direct quote or the USD table. */
+function currencyPairRate(fromCode, toCode) {
+    if (!fromCode || !toCode) return null;
+    if (fromCode === toCode) return 1;
+    var direct = CURRENCY_PAIR_RATES[fromCode + ':' + toCode];
+    if (direct > 0 && isFinite(direct)) return direct;
+    var inverse = CURRENCY_PAIR_RATES[toCode + ':' + fromCode];
+    if (inverse > 0 && isFinite(inverse)) return 1 / inverse;
+    if (CURRENCIES[fromCode] > 0 && CURRENCIES[toCode] > 0) {
+        return CURRENCIES[toCode] / CURRENCIES[fromCode];
+    }
+    return null;
+}
+
+function rememberCurrencyPairRate(fromCode, toCode, rate) {
+    if (!fromCode || !toCode || fromCode === toCode) return;
+    if (!(rate > 0) || !isFinite(rate)) return;
+    CURRENCY_PAIR_RATES[fromCode + ':' + toCode] = rate;
+}
+
 // Helper function to normalize currency name/code to 3-letter code
 function normalizeCurrency(currency) {
     if (!currency) return null;
     var normalized = currency.trim().toLowerCase();
-    // Check if it's already a 3-letter code
-    if (normalized.length === 3 && CURRENCIES[normalized.toUpperCase()]) {
-        return normalized.toUpperCase();
-    }
     // Check currency name mapping
     if (CURRENCY_NAMES[normalized]) {
         return CURRENCY_NAMES[normalized];
+    }
+    // Any real ISO code, whether or not a rate has been loaded.
+    if (/^[a-z]{3}$/.test(normalized) && isKnownCurrencyCode(normalized.toUpperCase())) {
+        return normalized.toUpperCase();
     }
     // Dynamic symbol lookup (derived from API-backed CURRENCIES codes).
     var symbolCodes = CURRENCY_SYMBOL_TO_CODES[currency.trim()];
@@ -764,6 +817,144 @@ function normalizeCurrency(currency) {
         return symbolCodes[0];
     }
     return null;
+}
+
+function currencyTokenIsSymbol(token) {
+    var trimmed = String(token || '').trim();
+    if (trimmed === '$$') return true;
+    if (typeof CURRENCY_SYMBOLS === 'undefined') return false;
+    for (var i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+        if (CURRENCY_SYMBOLS[i].symbol === trimmed) return true;
+    }
+    return false;
+}
+
+function resolveCurrencyToken(token) {
+    if (!token) return null;
+    var trimmed = String(token).trim();
+    if (trimmed === '$$') return 'USD';
+    if (typeof CURRENCY_SYMBOLS !== 'undefined') {
+        for (var i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+            if (CURRENCY_SYMBOLS[i].symbol === trimmed) return CURRENCY_SYMBOLS[i].code;
+        }
+    }
+    return normalizeCurrency(trimmed);
+}
+
+// JP¥ / CN¥ typed from a keyboard, including fullwidth yen and the Windows yen key (backslash).
+function normalizeTypedCurrencyMarks(text) {
+    return String(text || '')
+        .replace(/JP[\u00A5\uFFE5\\]/gi, 'JPY ')
+        .replace(/CN[\u00A5\uFFE5\\]/gi, 'CNY ');
+}
+
+function parseCurrencyAmountToken(part) {
+    var raw = String(part || '').trim();
+    var compact = raw.replace(/\s+/g, '');
+    if (!compact) return null;
+    if (typeof CURRENCY_SYMBOLS !== 'undefined') {
+        for (var i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+            var sym = CURRENCY_SYMBOLS[i].symbol;
+            if (compact.indexOf(sym) !== 0) continue;
+            var rest = compact.slice(sym.length);
+            if (/^[+-]?(?:\d+\.\d+|\d+|\.\d+)$/.test(rest)) {
+                return { amount: parseFloat(rest), code: CURRENCY_SYMBOLS[i].code };
+            }
+        }
+        for (var j = 0; j < CURRENCY_SYMBOLS.length; j++) {
+            var suffix = CURRENCY_SYMBOLS[j].symbol;
+            if (compact.length <= suffix.length || compact.slice(-suffix.length) !== suffix) continue;
+            var num = compact.slice(0, -suffix.length);
+            if (/^[+-]?(?:\d+\.\d+|\d+|\.\d+)$/.test(num)) {
+                return { amount: parseFloat(num), code: CURRENCY_SYMBOLS[j].code };
+            }
+        }
+    }
+    var named = raw.match(/^([+-]?(?:\d+\.\d+|\d+|\.\d+))\s+(.+)$/);
+    if (named) {
+        var namedCode = resolveCurrencyToken(named[2]);
+        if (namedCode) return { amount: parseFloat(named[1]), code: namedCode };
+    }
+    var glued = compact.match(/^([+-]?(?:\d+\.\d+|\d+|\.\d+))([A-Za-z]{3})$/);
+    if (glued) {
+        var gluedCode = resolveCurrencyToken(glued[2]);
+        if (gluedCode) return { amount: parseFloat(glued[1]), code: gluedCode };
+    }
+    // "mxn 2000", "JPY 155520", "yen 100" — the code or name before the amount.
+    var codeFirst = raw.match(/^(.+?)\s+([+-]?(?:\d+\.\d+|\d+|\.\d+))$/);
+    if (codeFirst) {
+        var leadCode = resolveCurrencyToken(codeFirst[1]);
+        if (leadCode) return { amount: parseFloat(codeFirst[2]), code: leadCode };
+    }
+    var codeGlued = compact.match(/^([A-Za-z]{3})([+-]?(?:\d+\.\d+|\d+|\.\d+))$/);
+    if (codeGlued) {
+        var prefixCode = resolveCurrencyToken(codeGlued[1]);
+        if (prefixCode) return { amount: parseFloat(codeGlued[2]), code: prefixCode };
+    }
+    return null;
+}
+
+/**
+ * "JP¥155,520 in usd", "JP¥155,520 in $", "JP¥155,520 in $$", and "100 USD to EUR".
+ * Returns null when this is not a currency conversion, so unit conversions still run.
+ */
+function tryCurrencyConversion(input) {
+    var text = normalizeTypedCurrencyMarks(input).replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '').trim();
+    var parts = text.match(/^(.*?)\s+(?:to|in)\s*(.+)$/i);
+    if (!parts) return null;
+    var parsed = parseCurrencyAmountToken(parts[1]);
+    var toToken = parts[2].trim();
+    var toCode = resolveCurrencyToken(toToken);
+    if (!parsed || !toCode) return null;
+    if (parsed.code === toCode) {
+        if (!(CURRENCIES[parsed.code] > 0)) return CURRENCY_RATE_UNAVAILABLE;
+    }
+    var pairRate = currencyPairRate(parsed.code, toCode);
+    if (!(pairRate > 0)) return CURRENCY_RATE_UNAVAILABLE;
+    var result = parsed.amount * pairRate;
+    if (!isFinite(result)) return null;
+    var negative = result < 0;
+    var body = Math.abs(result).toFixed(2);
+    if (currencyTokenIsSymbol(toToken)) {
+        var sym = toToken === '$$' ? '$' : toToken;
+        return (negative ? '-' : '') + sym + body;
+    }
+    return (negative ? '-' : '') + body + ' ' + toCode;
+}
+
+/** True when this entry should wait for the exchangerate-api cache before calculating. */
+function needsLiveCurrencyRates(input) {
+    var text = normalizeTypedCurrencyMarks(input).replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '');
+    var parts = text.match(/^(.*?)\s+(?:to|in)\s*(.+)$/i);
+    if (parts && parseCurrencyAmountToken(parts[1]) && resolveCurrencyToken(String(parts[2]).trim())) {
+        return true;
+    }
+    if (typeof CURRENCY_SYMBOLS !== 'undefined') {
+        var compact = text.replace(/\s/g, '');
+        for (var i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+            if (compact.indexOf(CURRENCY_SYMBOLS[i].symbol) !== -1) return true;
+        }
+        if (textHasIsoCurrencyAmount(compact)) return true;
+    }
+    return false;
+}
+
+function textHasIsoCurrencyAmount(compact) {
+    var match;
+    var pattern = /[A-Za-z]{3}/g;
+    while ((match = pattern.exec(compact))) {
+        var code = match[0].toUpperCase();
+        if (!isKnownCurrencyCode(code)) continue;
+        var before = match.index > 0 ? compact.charAt(match.index - 1) : '';
+        var after = compact.charAt(match.index + 3);
+        if (/\d/.test(before) || /\d/.test(after)) return true;
+    }
+    return false;
+}
+
+function ensureCurrencyRates() {
+    if (typeof loadCurrencyRates !== 'function') return Promise.resolve(CURRENCIES);
+    return loadCurrencyRates();
 }
 
 // Currency update functions
@@ -778,17 +969,15 @@ async function fetchCurrencyRates() {
             throw new Error('Failed to fetch currency rates');
         }
         var data = await response.json();
-        
-        // Convert rates to our format (USD = 1, others relative to USD)
+        if (!data || !data.rates || typeof data.rates !== 'object') return null;
+
+        // The feed is quoted as units of each currency per 1 USD.
         var rates = { USD: 1 };
-        if (data.rates) {
-            // Store rates as they come from API (already relative to USD)
-            for (var currency in data.rates) {
-                rates[currency] = data.rates[currency];
-            }
-            rebuildCurrencySymbolLookup();
+        for (var currency in data.rates) {
+            if (!data.rates.hasOwnProperty(currency)) continue;
+            if (!(data.rates[currency] > 0)) continue;
+            rates[currency] = data.rates[currency];
         }
-        
         return rates;
     } catch (error) {
         console.log('Currency API fetch failed:', error);
@@ -796,7 +985,66 @@ async function fetchCurrencyRates() {
     }
 }
 
-// Load currency rates from storage or fetch if needed
+/**
+ * Turn a Google or Wolfram answer to "1 USD to XXX" into units of XXX per 1 USD.
+ * Returns null when the text has no usable amount.
+ */
+function parseQuotedRatePerUsd(text) {
+    if (text == null) return null;
+    var raw = String(text).trim();
+    if (!raw) return null;
+    if (typeof stripCurrencySymbols === 'function') raw = stripCurrencySymbols(raw);
+    raw = raw.replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '');
+    var afterEq = raw.match(/=\s*([0-9]*\.?[0-9]+(?:[eE][+\-]?\d+)?)/);
+    if (afterEq) {
+        var eqNum = Number(afterEq[1]);
+        if (eqNum > 0 && isFinite(eqNum)) return eqNum;
+    }
+    var nums = raw.match(/[0-9]*\.?[0-9]+(?:[eE][+\-]?\d+)?/g) || [];
+    var values = [];
+    for (var i = 0; i < nums.length; i++) {
+        var n = Number(nums[i]);
+        if (n > 0 && isFinite(n)) values.push(n);
+    }
+    if (values.length === 0) return null;
+    if (values.length === 1) return values[0];
+    for (var j = 0; j < values.length; j++) {
+        if (Math.abs(values[j] - 1) > 1e-12) return values[j];
+    }
+    return values[0];
+}
+
+function mergeCurrencyRates(rates) {
+    if (!rates) return;
+    for (var code in rates) {
+        if (!rates.hasOwnProperty(code)) continue;
+        if (typeof rates[code] === 'number' && rates[code] > 0 && isFinite(rates[code])) {
+            CURRENCIES[code] = rates[code];
+        }
+    }
+    rebuildCurrencySymbolLookup();
+}
+
+function applyCurrencyRates(rates) {
+    var existing = [];
+    for (var code in CURRENCIES) {
+        if (CURRENCIES.hasOwnProperty(code)) existing.push(code);
+    }
+    for (var i = 0; i < existing.length; i++) delete CURRENCIES[existing[i]];
+    if (rates) {
+        for (var next in rates) {
+            if (!rates.hasOwnProperty(next)) continue;
+            if (typeof rates[next] === 'number' && rates[next] > 0 && isFinite(rates[next])) {
+                CURRENCIES[next] = rates[next];
+            }
+        }
+    }
+    rebuildCurrencySymbolLookup();
+}
+
+// Load currency rates from storage or fetch if needed.
+// A cache younger than 24 hours is a previous successful check. Otherwise fetch.
+// If the fetch fails and there is no saved check, the table stays empty.
 async function loadCurrencyRates() {
     return new Promise(function(resolve) {
         if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
@@ -804,47 +1052,33 @@ async function loadCurrencyRates() {
                 var now = Date.now();
                 var timestamp = result.currencyRatesTimestamp || 0;
                 var rates = result.currencyRates;
-                
-                // Check if rates are stale (older than 24 hours) or missing
-                if (!rates || (now - timestamp) > CURRENCY_UPDATE_INTERVAL) {
-                    // Fetch new rates
-                    fetchCurrencyRates().then(function(newRates) {
-                        if (newRates) {
-                            // Update CURRENCIES object
-                            for (var currency in newRates) {
-                                CURRENCIES[currency] = newRates[currency];
-                            }
-                            rebuildCurrencySymbolLookup();
-                            // Save to storage
-                            chrome.storage.local.set({
-                                currencyRates: newRates,
-                                currencyRatesTimestamp: now
-                            });
-                            resolve(newRates);
-                        } else {
-                            // API failed, use existing rates or defaults
-                            if (rates) {
-                                for (var currency in rates) {
-                                    CURRENCIES[currency] = rates[currency];
-                                }
-                                rebuildCurrencySymbolLookup();
-                            }
-                            resolve(rates || CURRENCIES);
-                        }
-                    });
-                } else {
-                    // Rates are still fresh, use cached rates
-                    if (rates) {
-                        for (var currency in rates) {
-                            CURRENCIES[currency] = rates[currency];
-                        }
-                        rebuildCurrencySymbolLookup();
-                    }
-                    resolve(rates || CURRENCIES);
+                var cacheIsFresh = rates && (now - timestamp) <= CURRENCY_UPDATE_INTERVAL;
+
+                if (cacheIsFresh) {
+                    applyCurrencyRates(rates);
+                    resolve(rates);
+                    return;
                 }
+
+                fetchCurrencyRates().then(function(newRates) {
+                    if (newRates) {
+                        applyCurrencyRates(newRates);
+                        chrome.storage.local.set({
+                            currencyRates: newRates,
+                            currencyRatesTimestamp: now
+                        });
+                        resolve(newRates);
+                    } else if (rates) {
+                        applyCurrencyRates(rates);
+                        resolve(rates);
+                    } else {
+                        // Leave any quotes already taken from Google or Wolfram in place.
+                        resolve(CURRENCIES);
+                    }
+                });
             });
         } else {
-            // Not in Chrome extension context, use default rates
+            // Outside the extension, keep whatever table the caller supplied.
             resolve(CURRENCIES);
         }
     });
@@ -1185,6 +1419,10 @@ function unitsJsCalc(input) {
     // Handle empty input
     if (!input) return null;
 
+    // Symbol amounts such as "JP¥155,520 in usd" / "in $" / "in $$".
+    var earlyCurrency = tryCurrencyConversion(input);
+    if (earlyCurrency) return earlyCurrency;
+
     // BEFORE generic "expr in unit": parenthesized value (e.g. "(2 * (3 ft + 6 in)) in m").
     // Generic inToMatch normalizes "(2*(3ft+6in))" and breaks inner "+" — must run here first.
     var parenUnitEarly = input.match(/^\((.*)\)\s+in\s+([a-zA-Z\-²³]+)$/i);
@@ -1407,24 +1645,7 @@ function unitsJsCalc(input) {
         }
     }
     
-    // Check for currency conversions (e.g., "100 USD to EUR", "1 euro in usd", "1 euro to usd")
-    // Allow trailing equals sign or other characters
-    var currencyMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z$€£¥₽\s]+)\s*(?:to|in)\s*([a-zA-Z$€£¥₽\s]+)(?:\s*=|$)/i);
-    if (currencyMatch) {
-        var value = currencyMatch[1];
-        var fromCurrStr = currencyMatch[2].trim();
-        var toCurrStr = currencyMatch[3].trim();
-        
-        // Normalize currency names/codes to 3-letter codes
-        var fromCurr = normalizeCurrency(fromCurrStr);
-        var toCurr = normalizeCurrency(toCurrStr);
-        
-        if (fromCurr && toCurr && CURRENCIES[fromCurr] && CURRENCIES[toCurr]) {
-            var usdValue = parseFloat(value) / CURRENCIES[fromCurr];
-            var result = usdValue * CURRENCIES[toCurr];
-            return result.toFixed(2)+" "+toCurr;
-        }
-    }
+    // "100 USD to EUR" and "JP¥155,520 in $" are handled by tryCurrencyConversion above.
     
     // Check for fuel economy conversions (e.g., "30 mpg to L/100km", "8 L/100km to mpg")
     var fuelEconMatch = input.match(/^(\d+(?:\.\d+)?)\s+([a-zA-Z\/\s0-9]+)\s+(?:to|in)\s+([a-zA-Z\/\s0-9]+)$/i);

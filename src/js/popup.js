@@ -64,7 +64,13 @@ const CURRENCY_SYMBOLS = [
     { symbol: 'NT$', code: 'TWD', decimals: 2 },
     { symbol: 'US$', code: 'USD', decimals: 2 },
     { symbol: 'JP¥', code: 'JPY', decimals: 0 },
+    { symbol: 'JP\u00A5', code: 'JPY', decimals: 0 },
+    { symbol: 'JP\uFFE5', code: 'JPY', decimals: 0 },
+    { symbol: 'JP\\', code: 'JPY', decimals: 0 },
     { symbol: 'CN¥', code: 'CNY', decimals: 2 },
+    { symbol: 'CN\u00A5', code: 'CNY', decimals: 2 },
+    { symbol: 'CN\uFFE5', code: 'CNY', decimals: 2 },
+    { symbol: 'CN\\', code: 'CNY', decimals: 2 },
     { symbol: 'MX$', code: 'MXN', decimals: 2 },
     { symbol: 'CL$', code: 'CLP', decimals: 0 },
     { symbol: 'AR$', code: 'ARS', decimals: 2 },
@@ -89,6 +95,8 @@ const CURRENCY_SYMBOLS = [
     { symbol: '€', code: 'EUR', decimals: 2 },
     { symbol: '£', code: 'GBP', decimals: 2 },
     { symbol: '¥', code: 'JPY', decimals: 0 },
+    { symbol: '\u00A5', code: 'JPY', decimals: 0 },
+    { symbol: '\uFFE5', code: 'JPY', decimals: 0 },
     { symbol: '₹', code: 'INR', decimals: 2 },
     { symbol: '₽', code: 'RUB', decimals: 2 },
     { symbol: '₩', code: 'KRW', decimals: 0 },
@@ -108,7 +116,18 @@ const CURRENCY_SYMBOLS = [
     { symbol: '৳', code: 'BDT', decimals: 2 },
     { symbol: '₨', code: 'PKR', decimals: 2 },
     { symbol: '元', code: 'CNY', decimals: 2 },
-    { symbol: '﷼', code: 'SAR', decimals: 2 }
+    { symbol: '﷼', code: 'SAR', decimals: 2 },
+    // One key on a national keyboard. Fullwidth yen and won are what those keys insert.
+    { symbol: '￥', code: 'JPY', decimals: 0 },
+    { symbol: '￦', code: 'KRW', decimals: 0 },
+    { symbol: '＄', code: 'USD', decimals: 2 },
+    { symbol: '￡', code: 'GBP', decimals: 2 },
+    { symbol: 'đ', code: 'VND', decimals: 0 },
+    { symbol: '֏', code: 'AMD', decimals: 2 },
+    { symbol: '؋', code: 'AFN', decimals: 2 },
+    { symbol: '₭', code: 'LAK', decimals: 2 },
+    { symbol: '₮', code: 'MNT', decimals: 2 },
+    { symbol: '៛', code: 'KHR', decimals: 2 }
 ].sort((a, b) => b.symbol.length - a.symbol.length);
 
 function currencyBoundaryBefore(expr, index) {
@@ -181,17 +200,115 @@ function currencyRateTable() {
     return null;
 }
 
-/** Convert using the loaded table, where each rate is units of that currency per 1 USD. */
+/** Convert with a direct pair quote, or the USD table when both sides are loaded. */
 function convertCurrencyAmount(amount, fromCode, toCode) {
     if (fromCode === toCode) return amount;
-    const rates = currencyRateTable();
-    const fromRate = rates ? rates[fromCode] : undefined;
-    const toRate = rates ? rates[toCode] : undefined;
-    if (!(fromRate > 0) || !(toRate > 0)) {
-        const missing = !(fromRate > 0) ? fromCode : toCode;
-        throw new Error('No exchange rate for ' + missing);
+    const rate = typeof currencyPairRate === 'function' ? currencyPairRate(fromCode, toCode) : null;
+    if (!(rate > 0)) {
+        throw new Error(typeof CURRENCY_RATE_UNAVAILABLE === 'string'
+            ? CURRENCY_RATE_UNAVAILABLE
+            : 'current exchange rate not available');
     }
-    return amount / fromRate * toRate;
+    return amount * rate;
+}
+
+function readIsoCurrencyCodeAt(expr, index) {
+    const slice = expr.slice(index, index + 3);
+    if (!/^[A-Za-z]{3}$/.test(slice)) return null;
+    if (index + 3 < expr.length && /[A-Za-z]/.test(expr[index + 3])) return null;
+    const code = slice.toUpperCase();
+    if (typeof isKnownCurrencyCode !== 'function' || !isKnownCurrencyCode(code)) return null;
+    return code;
+}
+
+function isoCurrencyMatch(expr, start, end, code, amount) {
+    return {
+        start: start,
+        end: end,
+        symbol: '',
+        code: code,
+        decimals: typeof currencyMinorUnits === 'function' ? currencyMinorUnits(code) : 2,
+        amount: amount,
+        iso: true
+    };
+}
+
+function matchIsoCurrencyPrefix(expr, index) {
+    if (!currencyBoundaryBefore(expr, index)) return null;
+    const code = readIsoCurrencyCodeAt(expr, index);
+    if (!code) return null;
+    let cursor = index + 3;
+    let sign = 1;
+    if (expr[cursor] === '+' || expr[cursor] === '-') {
+        if (expr[cursor] === '-') sign = -1;
+        cursor++;
+    }
+    const num = readPlainNumberAt(expr, cursor);
+    if (!num) return null;
+    return isoCurrencyMatch(expr, index, num.end, code, sign * num.value);
+}
+
+function matchIsoCurrencySuffix(expr, index) {
+    if (!currencyBoundaryBefore(expr, index)) return null;
+    if (expr[index] !== '.' && !/\d/.test(expr[index] || '')) return null;
+    const num = readPlainNumberAt(expr, index);
+    if (!num) return null;
+    const code = readIsoCurrencyCodeAt(expr, num.end);
+    if (!code) return null;
+    const end = num.end + 3;
+    if (!currencyBoundaryAfter(expr, end)) return null;
+    return isoCurrencyMatch(expr, index, end, code, num.value);
+}
+
+function nextCurrencyMatch(expr, index) {
+    const prefix = matchCurrencyPrefix(expr, index);
+    if (prefix) return prefix;
+    const isoPrefix = matchIsoCurrencyPrefix(expr, index);
+    if (isoPrefix) return isoPrefix;
+    const suffix = matchCurrencySuffix(expr, index);
+    if (suffix) return suffix;
+    return matchIsoCurrencySuffix(expr, index);
+}
+
+/** Pairs that still need a quote. The target is the first currency, or the in/to currency. */
+function currencyPairsNeeded(input) {
+    const text = typeof normalizeTypedCurrencyMarks === 'function'
+        ? normalizeTypedCurrencyMarks(stripGroupingCommas(String(input || '')))
+        : stripGroupingCommas(String(input || ''));
+    const pairs = [];
+    const seen = {};
+    const add = (from, to) => {
+        if (!from || !to || from === to) return;
+        if (typeof currencyPairRate === 'function' && currencyPairRate(from, to) > 0) return;
+        const key = from + ':' + to;
+        if (seen[key]) return;
+        seen[key] = true;
+        pairs.push({ from: from, to: to });
+    };
+    if (typeof parseCurrencyAmountToken === 'function' && typeof resolveCurrencyToken === 'function') {
+        const parts = text.match(/^(.*?)\s+(?:to|in)\s*(.+)$/i);
+        if (parts) {
+            const parsed = parseCurrencyAmountToken(parts[1]);
+            const toCode = resolveCurrencyToken(String(parts[2]).trim());
+            if (parsed && toCode) add(parsed.code, toCode);
+            return pairs;
+        }
+    }
+    const compact = text.replace(/\s/g, '');
+    const matches = [];
+    let index = 0;
+    while (index < compact.length) {
+        const match = nextCurrencyMatch(compact, index);
+        if (match) {
+            matches.push(match);
+            index = match.end;
+            continue;
+        }
+        index++;
+    }
+    if (matches.length < 2) return [];
+    for (let i = 1; i < matches.length; i++) add(matches[i].code, matches[0].code);
+    return pairs;
 }
 
 function currencyNumberLiteral(amount) {
@@ -209,16 +326,10 @@ function rewriteCurrencyExpression(expr) {
     const matches = [];
     let index = 0;
     while (index < expr.length) {
-        const prefix = matchCurrencyPrefix(expr, index);
-        if (prefix) {
-            matches.push(prefix);
-            index = prefix.end;
-            continue;
-        }
-        const suffix = matchCurrencySuffix(expr, index);
-        if (suffix) {
-            matches.push(suffix);
-            index = suffix.end;
+        const match = nextCurrencyMatch(expr, index);
+        if (match) {
+            matches.push(match);
+            index = match.end;
             continue;
         }
         index++;
@@ -228,7 +339,8 @@ function rewriteCurrencyExpression(expr) {
     const currency = {
         symbol: matches[0].symbol,
         code: matches[0].code,
-        decimals: matches[0].decimals
+        decimals: matches[0].decimals,
+        iso: matches[0].iso === true
     };
     let out = '';
     let cursor = 0;
@@ -262,6 +374,20 @@ function replaceConstantE(expr) {
         }
         return String(Math.E);
     });
+}
+
+function matchDisplayedCurrencySymbol(text) {
+    const trimmed = String(text || '').trim();
+    const sign = trimmed.charAt(0) === '-' ? '-' : '';
+    const body = sign ? trimmed.slice(1) : trimmed;
+    if (typeof CURRENCY_SYMBOLS === 'undefined') return null;
+    for (let i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+        const symbol = CURRENCY_SYMBOLS[i].symbol;
+        if (!body.startsWith(symbol)) continue;
+        const amount = body.slice(symbol.length);
+        if (/^\d+\.\d{2}$/.test(amount)) return { sign: sign, symbol: symbol, amount: amount };
+    }
+    return null;
 }
 
 function roundCurrencyValue(value, decimals) {
@@ -444,7 +570,7 @@ class CloudyCalculator {
         const lastItem = resultItems[resultItems.length - 1];
         const lastValueNode = lastItem.querySelector('.result-value');
         if (!lastValueNode || !lastValueNode.dataset) return '';
-        return lastValueNode.dataset.currencySymbol || '';
+        return lastValueNode.dataset.currencySymbol || lastValueNode.dataset.currencyCode || '';
     }
 
     async init() {
@@ -839,6 +965,14 @@ class CloudyCalculator {
                 return;
             }
 
+            // Cross-currency math uses the exchangerate-api cache. If that check
+            // has no rate for the pair, Google then Wolfram are asked for those
+            // two currencies before the calculation.
+            if (typeof needsLiveCurrencyRates === 'function' && needsLiveCurrencyRates(input)) {
+                await ensureCurrencyRates();
+                await this.fillMissingRatesFromOnline(input);
+            }
+
             // Handle variable assignments first
             if (await this.handleVariableAssignment(input)) {
                 this.limitVariables();
@@ -887,9 +1021,14 @@ class CloudyCalculator {
             // Strip trailing equals sign for unit queries
             const inputForUnits = input.replace(/\s*=\s*$/, '');
             if (this.looksLikeUnitQuery(inputForUnits)) {
-                const unitsResult = unitsJsCalc(inputForUnits);
+                let unitsResult = unitsJsCalc(inputForUnits);
+                if (!unitsResult && typeof normalizeTypedCurrencyMarks === 'function') {
+                    const normalized = normalizeTypedCurrencyMarks(inputForUnits);
+                    if (normalized !== inputForUnits) unitsResult = unitsJsCalc(normalized);
+                }
                 if (unitsResult) {
-                    this.addResult(input, unitsResult, 'units');
+                    const rateMissing = unitsResult === CURRENCY_RATE_UNAVAILABLE;
+                    this.addResult(input, unitsResult, rateMissing ? 'error' : 'units');
                     const n = this.parseNumericFromResult(unitsResult);
                     this.variables['@'] = (typeof n === 'number' && isFinite(n))
                         ? popupSnapNearIntegerFloat(n)
@@ -949,6 +1088,13 @@ class CloudyCalculator {
             this.saveState();
 
         } catch (error) {
+            if (error && error.message === CURRENCY_RATE_UNAVAILABLE) {
+                this.addResult(input, CURRENCY_RATE_UNAVAILABLE, 'error');
+                this.saveState();
+                this.calcInput.value = '';
+                this.focusInput();
+                return;
+            }
             if (forced !== 'local' && this.onlineEngines !== 'off' && !this._onlineTried) {
                 const online = await this.askOnline(input, 'auto');
                 if (online) {
@@ -996,6 +1142,10 @@ class CloudyCalculator {
             // Check if the expression looks like a unit conversion query
             if (this.looksLikeUnitQuery(expression)) {
                 const unitsResult = unitsJsCalc(expression);
+                if (unitsResult === CURRENCY_RATE_UNAVAILABLE) {
+                    this.addResult(input, CURRENCY_RATE_UNAVAILABLE, 'error');
+                    return true;
+                }
                 if (unitsResult) {
                     this.variables[varName] = unitsResult;
                     const numValue = this.parseNumericFromResult(unitsResult);
@@ -1034,6 +1184,10 @@ class CloudyCalculator {
                 }
                 return true;
             } catch (error) {
+                if (error && error.message === CURRENCY_RATE_UNAVAILABLE) {
+                    this.addResult(input, CURRENCY_RATE_UNAVAILABLE, 'error');
+                    return true;
+                }
                 // If we get here, both unit conversion and main parser failed
                 let errorMessage = 'Error: ' + error.message;
                 
@@ -1162,6 +1316,36 @@ class CloudyCalculator {
             typeof chrome.runtime.sendMessage === 'function';
     }
 
+    async lookupPairRate(fromCode, toCode) {
+        if (typeof window !== 'undefined' && typeof window.__CLOUDY_ONLINE_RATE_LOOKUP__ === 'function') {
+            const supplied = await window.__CLOUDY_ONLINE_RATE_LOOKUP__(fromCode, toCode);
+            if (typeof supplied === 'number' && supplied > 0 && isFinite(supplied)) return supplied;
+            if (typeof supplied === 'string') return parseQuotedRatePerUsd(supplied);
+            return null;
+        }
+        if (!this.canUseOnlineMessaging()) return null;
+        const query = '1 ' + fromCode + ' to ' + toCode;
+        const google = await this.askOnline(query, 'google');
+        const googleRate = google && parseQuotedRatePerUsd(google.output);
+        if (googleRate > 0) return googleRate;
+        if (String(this.wolframAppId || '').trim()) {
+            const wolfram = await this.askOnline(query, 'wolfram');
+            const wolframRate = wolfram && parseQuotedRatePerUsd(wolfram.output);
+            if (wolframRate > 0) return wolframRate;
+        }
+        return null;
+    }
+
+    async fillMissingRatesFromOnline(input) {
+        if (this.onlineEngines === 'off') return;
+        if (typeof currencyPairsNeeded !== 'function' || typeof rememberCurrencyPairRate !== 'function') return;
+        const pairs = currencyPairsNeeded(input);
+        for (let i = 0; i < pairs.length; i++) {
+            const rate = await this.lookupPairRate(pairs[i].from, pairs[i].to);
+            if (rate > 0) rememberCurrencyPairRate(pairs[i].from, pairs[i].to, rate);
+        }
+    }
+
     askOnline(query, engine) {
         this._onlineTried = true;
         if (!query || !this.canUseOnlineMessaging()) return Promise.resolve(null);
@@ -1224,6 +1408,9 @@ class CloudyCalculator {
         const negative = value < 0;
         let body = Math.abs(Number(value)).toFixed(decimals);
         if (this.groupDigits) body = applyThousandsSeparators(body);
+        if (currency && currency.iso && currency.code) {
+            return (negative ? '-' : '') + body + ' ' + currency.code;
+        }
         return (negative ? '-' : '') + symbol + body;
     }
 
@@ -1238,9 +1425,14 @@ class CloudyCalculator {
         // Strip trailing "=" (calculator-style input like "10000*50=")
         expr = expr.replace(/[+\-*/^=]+$/, '');
 
-        const rewritten = rewriteCurrencyExpression(expr);
-        expr = rewritten.expr;
-        this._activeCurrency = rewritten.currency;
+        // "JP¥155,520 in usd" is a conversion. Stripping the symbol here leaves "in"
+        // and the parser reports "Unexpected character: i".
+        const conversionPhrase = /\s(?:to|in)\s*/i.test(expression);
+        if (!conversionPhrase) {
+            const rewritten = rewriteCurrencyExpression(expr);
+            expr = rewritten.expr;
+            this._activeCurrency = rewritten.currency;
+        }
         
         let pos = 0;
 
@@ -1543,10 +1735,16 @@ class CloudyCalculator {
         } else if (typeof result === 'number' && isFinite(result)) {
             displayResult = this.formatNumber(result, formatSpec);
         } else if (typeof result === 'string') {
-            // Check if result contains a unit (e.g., "3.42 ft", "5 kg")
-            // Unit patterns: space followed by letters/units
+            const moneyCode = String(result).trim().match(/^(-?)(\d+\.\d{2}) ([A-Z]{3})$/);
+            const moneySymbol = matchDisplayedCurrencySymbol(String(result).trim());
             const unitPattern = /\s+[a-zA-Zµ\-²³]+$/;
-            if (unitPattern.test(result)) {
+            if (moneyCode) {
+                const grouped = this.groupDigits ? applyThousandsSeparators(moneyCode[2]) : moneyCode[2];
+                displayResult = moneyCode[1] + grouped + ' ' + moneyCode[3];
+            } else if (moneySymbol) {
+                const grouped = this.groupDigits ? applyThousandsSeparators(moneySymbol.amount) : moneySymbol.amount;
+                displayResult = moneySymbol.sign + moneySymbol.symbol + grouped;
+            } else if (unitPattern.test(result)) {
                 // Result has a unit - preserve it, only format the number part
                 const parts = result.split(/\s+(.+)$/);
                 if (parts.length >= 2) {
@@ -1837,6 +2035,26 @@ class CloudyCalculator {
 
     // Check if input looks like a unit conversion query
     looksLikeUnitQuery(input) {
+        // Either side may be any currency. "mxn 2000 to eur" has no dollar sign,
+        // and the code sits before the number, so the digit patterns below miss it.
+        if (typeof parseCurrencyAmountToken === 'function' && typeof resolveCurrencyToken === 'function') {
+            let currencyText = input;
+            if (typeof normalizeTypedCurrencyMarks === 'function') currencyText = normalizeTypedCurrencyMarks(currencyText);
+            currencyText = String(currencyText).replace(/[,\u060C\u066C\u201A\uFE10\uFE50\uFF0C]/g, '');
+            const currencyParts = currencyText.match(/^(.*?)\s+(?:to|in)\s*(.+)$/i);
+            if (currencyParts && parseCurrencyAmountToken(currencyParts[1]) && resolveCurrencyToken(String(currencyParts[2]).trim())) {
+                return true;
+            }
+        }
+        // "JP¥155,520 in £" has no word after "in", so the letter checks below miss it.
+        if (/\s(?:to|in)\s*/i.test(input)) {
+            if (/\$\$?/.test(input)) return true;
+            if (typeof CURRENCY_SYMBOLS !== 'undefined') {
+                for (let i = 0; i < CURRENCY_SYMBOLS.length; i++) {
+                    if (input.indexOf(CURRENCY_SYMBOLS[i].symbol) !== -1) return true;
+                }
+            }
+        }
         // Currency compact forms with optional spaces, including symbols (e.g. "46000 rub to$", "100$ in eur")
         if (/\d+(?:\.\d+)?\s*([a-zA-Z$€£¥₽]{1,}|[A-Z]{3})\s*(?:to|in)\s*([a-zA-Z$€£¥₽]{1,}|[A-Z]{3})/i.test(input)) {
             return true;
